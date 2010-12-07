@@ -496,8 +496,8 @@ eigen <- function(object, ...) UseMethod('eigen')
 
 eigen.matrix <- function(object, ...) base:::eigen(object, ...)
 
-eigen.I1 <- function(object, only.values, ...) {
-    out <- eigen(companion(VAR(object)), only.values = only.values, ...)
+eigen.I1 <- function(object, ...) {
+    out <- eigen(companion(VAR(object)), ...)
     class(out)	<- 'eigenCompanion'
     return(out)
 }
