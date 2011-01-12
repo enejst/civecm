@@ -1212,26 +1212,20 @@ summary.I1 <- function(object, ...) {
     else se.PSi <- t.PSi <- NULL
     colnames(PI)
 	
-    tmp	<- object['call']
-    tmp$beta <- object$beta
-    tmp$alpha <- object$alpha
-    tmp$t.alpha <- t.aLpha
-    tmp$Pi <- PI
-    tmp$t.Pi <- t.PI
-    tmp$Psi <- object$Psi
-    tmp$t.Psi <- t.PSi
-    tmp$Omega <- OMega
-    tmp$Sigma <- SIgma
-    tmp$eigenvalues <-object$values
-    tmp$logLik <- ll
-    tmp$rank <- rank
-    tmp$p <- c(p0 = p0, p1 = p1, p2 = p2)
-    tmp$lags <- object$lags
-    tmp$residuals <- object$residuals
+    object$t.alpha <- t.aLpha
+    object$Pi <- PI
+    object$t.Pi <- t.PI
+    object$Psi <- object$Psi
+    object$t.Psi <- t.PSi
+    object$Omega <- OMega
+    object$Sigma <- SIgma
+    object$logLik <- ll
+    object$rank <- rank
+    object$p <- c(p0 = p0, p1 = p1, p2 = p2)
     
-    class(tmp) <- 'summary.I1'
+    class(object) <- 'summary.I1'
 	
-    return(tmp)
+    return(object)
 }
 
 summary.I2 <- function(object, ...) {
