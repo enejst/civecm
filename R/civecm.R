@@ -11,30 +11,37 @@
 anova.I1 <- function(object, ..., df) {
     if(length(objects <- list(object, ...)) == 1) stop('Nothing to test against')
     test <- 2 * (logLik(objects[[1]]) - logLik(objects[[2]]))
-    return(data.frame(Value = test, 
-                      Test = paste('ChiSq(', df, ')', sep = ''), 
+    return(data.frame(Value = test,
+                      Test = paste('ChiSq(', df, ')', sep = ''),
                       p.value = 1 - pchisq(test, df)
                       )
            )
 }
 
-auxI1 <- function(ft) {
-    if (ncol(ft$beta) > 0) {
+auxI1 <- function(ft)
+{
+    if (ncol(ft$beta) > 0)
+    {
         colnames(ft$beta) <- paste('beta(', 1:ncol(ft$beta), ')', sep = '')
         colnames(ft$alpha) <- paste('alpha(', 1:ncol(ft$alpha), ')', sep = '')
     }
     rownames(ft$beta) <- colnames(ft$Z1)
     rownames(ft$alpha) <- colnames(ft$Z0)
-	
-    if (!is.null(ft$Z2)) {
-        ft$Psi <- with(ft, t(lm.fit(Z2, Z0 - Z1 %*% tcrossprod(beta, alpha))$coef))
+
+    if (!is.null(ft$Z2))
+    {
+        tmpfit <- with(ft, lm.fit(Z2, Z0 - Z1 %*% tcrossprod(beta, alpha)))
+        ft$Psi <- t(tmpfit$coef)
         colnames(ft$Psi) <- colnames(ft$Z2)
-        ft$fitted.values <- with(ft, xts(Z1 %*% tcrossprod(beta, alpha) +
-                                            tcrossprod(Z2, Psi), index(Z1)))
+        ft$fitted.values <- xts(tmpfit$fitted.values, index(ft$Z0))
+        ft$residuals <- xts(tmpfit$residuals, index(ft$Z0))
     }
-    else ft$fitted.values <- with(ft, as.xts(Z1 %*% tcrossprod(beta, alpha), index(Z1)))
-	
-    ft$residuals <- ft$Z0 - ft$fitted.values
+    else
+    {
+        ft$fitted.values <- with(ft, as.xts(Z1 %*% tcrossprod(beta, alpha), index(Z0)))
+        ft$residuals <- with(ft, as.xts(Z0 - fitted.values, index(Z0)))
+    }
+
     colnames(ft$residuals) <- colnames(ft$Z0)
     class(ft$residuals) <- c('I1res', class(ft$residuals))
 
@@ -79,20 +86,20 @@ auxI2 <- function(ft, r) {
     if (s1 != 0) {
         ft$beta1 <- Null(ft$beta) %*% eTa
         ft$alpha1 <- Null(ft$alpha) %*% kSi
-        rownames(ft$beta1) <- colnames(ft$R2)	
+        rownames(ft$beta1) <- colnames(ft$R2)
         colnames(ft$beta1) <- paste('beta1(', 1:ncol(ft$beta1), ')', sep = '')
-        rownames(ft$alpha1)	<- colnames(ft$R0)	
+        rownames(ft$alpha1)	<- colnames(ft$R0)
         colnames(ft$alpha1) <- paste('alpha1(', 1:ncol(ft$alpha1), ')', sep = '')
     }
     if (s2 != 0) {
         ft$beta2 <- Null(ft$beta) %*% Null(eTa)
         ft$alpha2 <- Null(ft$alpha) %*% Null(kSi)
-        rownames(ft$beta2) <- colnames(ft$R2)	
+        rownames(ft$beta2) <- colnames(ft$R2)
         colnames(ft$beta2) <- paste('beta2(', 1:ncol(ft$beta2), ')', sep = '')
-        rownames(ft$alpha2) <- colnames(ft$R0)	
+        rownames(ft$alpha2) <- colnames(ft$R0)
         colnames(ft$alpha2) <- paste('alpha2(', 1:ncol(ft$alpha2), ')', sep = '')
     }
-    
+
     if (r > 0) {
         colnames(ft$beta) <- paste('beta(', 1:ncol(ft$beta), ')', sep = '')
         colnames(ft$alpha) <- paste('alpha(', 1:ncol(ft$alpha), ')', sep = '')
@@ -104,7 +111,7 @@ auxI2 <- function(ft, r) {
     class(ft$residuals) <- c('I2res', class(ft$residuals))
 
     class(ft) <- c('I2', 'I1')
-    
+
     return(ft)
 }
 
@@ -129,7 +136,7 @@ boot <- function(bootfct, obj, reps, wild = TRUE, cluster = NULL) {
     sf <- function(dummy) {
         newcall	<- obj$call
         if (wild)
-            
+
             newcall[['data']] <- simulate(obj, res = obj$residuals * rnorm(reslen))
         else
             newcall[['data']] <- simulate(obj,
@@ -150,9 +157,9 @@ boot <- function(bootfct, obj, reps, wild = TRUE, cluster = NULL) {
     return(ans)
 }
 
-CIModelFrame	<- function(data, lags, dettrend, rank, season = FALSE, exogenous, dummy, ...) {
+CIModelFrame <- function(data, lags, dettrend, rank, season = FALSE, exogenous, dummy, ...) {
     X <- try.xts(data)
-    if (is.null(colnames(X))) colnames(X) <- paste('X', seq(ncol(X)), sep='.') 
+    if (is.null(colnames(X))) colnames(X) <- paste('X', seq(ncol(X)), sep='.')
     k <- lags
     fullSampleVec <- index(X)
     fullSample <- paste(format(as.POSIXct(first(fullSampleVec)), '%Y-%m-%d'),
@@ -215,7 +222,7 @@ CIModelFrame	<- function(data, lags, dettrend, rank, season = FALSE, exogenous, 
                                  else paste('l', rep(seq(k - 1), each = ncol(W)), '.d.', colnames(W), sep = ''))
         }
 
-        if (dettrend == -1) 
+        if (dettrend == -1)
             Det1 <- Det2 <- NULL
         else if (dettrend == 0) {
             Det1 <- xtsTime[, 1]
@@ -255,9 +262,9 @@ CIModelFrame	<- function(data, lags, dettrend, rank, season = FALSE, exogenous, 
             colnames(l.d2.W) <- c(paste('d2', colnames(W), sep = '.'),
                                   if (k == 2) NULL
                                   else paste('l', rep(seq_len(k - 2), each = ncol(W)), '.d2.', colnames(W), sep =''))
-        }   
-        
-        if (dettrend == -1) 
+        }
+
+        if (dettrend == -1)
             Det1 <- Det2 <- Det3 <- NULL
         else if (dettrend == 0) {
             Det2 <- xtsTime[, 1]
@@ -284,7 +291,7 @@ CIModelFrame	<- function(data, lags, dettrend, rank, season = FALSE, exogenous, 
         stopifnot(all(sapply(tmp, function(x) all(!is.na(x)))))
         class(tmp) <- 'model.frame.I2'
     }
-	
+
     return(tmp)
 }
 
@@ -341,9 +348,9 @@ CIModelFrame	<- function(data, lags, dettrend, rank, season = FALSE, exogenous, 
 
 # 	if (!poly.coint) {
 # 		if(lags == 1) l.dd.bl.X	<- NULL
-# 		else { 		
+# 		else {
 # 			l.dd.bl.X <- lag(fracdiff(bl.X, d), -(0:(lags - 2)))
-# 			colnames(l.dd.bl.X) <- paste('l', rep(1:(lags - 1), each = ncol(X)), 
+# 			colnames(l.dd.bl.X) <- paste('l', rep(1:(lags - 1), each = ncol(X)),
 #                                          '.d.', colnames(X), sep = '')
 # 		}
 # 		Du <- merge(l.d.W, dummy, season
@@ -367,7 +374,7 @@ CIModelFrame	<- function(data, lags, dettrend, rank, season = FALSE, exogenous, 
 # 		tmp$X <- X
 # 		tmp$Z0 <- Ztmp[,colnames(d.X), drop = F]
 # 		tmp$Z1 <- Ztmp[,c(colnames(db.bl.X), colnames(Dr)), drop = F]
-# 		tmp$Z2 <- if (!all(is.null(l.dd.bl.X), is.null(Du))) Ztmp[,c(colnames(l.dd.bl.X), 
+# 		tmp$Z2 <- if (!all(is.null(l.dd.bl.X), is.null(Du))) Ztmp[,c(colnames(l.dd.bl.X),
 #                                                                      colnames(Du)), drop = F]
 #         else NULL
 # 		class(tmp) <- 'model.frame.I1'
@@ -385,7 +392,7 @@ CIModelFrame	<- function(data, lags, dettrend, rank, season = FALSE, exogenous, 
 # 		}
 # 		if (!is.null(Dr)) {
 # 			d.Dr <- diff(Dr)
-# 			colnames(d.Dr) <- paste('d', colnames(Dr), sep = '.')			
+# 			colnames(d.Dr) <- paste('d', colnames(Dr), sep = '.')
 # 		}
 # 		else d.Dr <- NULL
 
@@ -401,7 +408,7 @@ CIModelFrame	<- function(data, lags, dettrend, rank, season = FALSE, exogenous, 
 # 		## Collect all Z's to get the timing and sample correct
 # 		Ztmp <- na.omit(merge(d2.X, l.d.X, d.Dr, bl.X, Dr, l.d2.X, Du))
 # 		colnames(Ztmp) <- unlist(sapply(list(d2.X, l.d.X, d.Dr, bl.X, Dr, l.d2.X, Du), colnames))
-	
+
 # 		tmp	<- list()
 # 		tmp$X <- X
 # 		tmp$Z0 <- Ztmp[, colnames(d2.X), drop = F]
@@ -411,9 +418,9 @@ CIModelFrame	<- function(data, lags, dettrend, rank, season = FALSE, exogenous, 
 #         else NULL
 # 		class(tmp) <- 'model.frame.I2'
 # 	}
-	
+
 # 	tmp$frequency <- frequency(Ztmp)
-		
+
 # 	return(tmp)
 # }
 
@@ -428,7 +435,7 @@ coefmatrix <- function(coef, stat1, digits = 3, sig.dig = c(TRUE, FALSE)) {
         else stop('Argument sig.dig must have length two')
     m.out <- matrix(, 0, ncol(coef))
     for (i in seq_len(nrow(coef))) {
-        m.out <- rbind(m.out, 
+        m.out <- rbind(m.out,
                        formatC(m.coef[i, ],
                                width = -1,
                                digits = digits,
@@ -484,11 +491,11 @@ datestring <- function(dates, freq) {
     return(ans)
 }
 
-### Calculates the eigenvalues of the companion matrix of the VAR. The argument 
+### Calculates the eigenvalues of the companion matrix of the VAR. The argument
 ### 'roots' can be either a vector of ranks for which the eigenvalues should be
 ### computed, the default value 'max' which will give the eigenvalues for all
-### possible cointegration ranks. The values will be calculated without any 
-### restrictions on the parameters. Finally it is possible parse the value 
+### possible cointegration ranks. The values will be calculated without any
+### restrictions on the parameters. Finally it is possible parse the value
 ### 'specific' and the function will give the eigenvalues for the specifik model
 ### with restrictions impoced.
 
@@ -508,27 +515,27 @@ I1gls <- function(obj, r) {
     tmp.fit <- lm.fit(obj$R1, obj$R0)
     Pi0	<- t(tmp.fit$coef)
     obj$Sigma <- crossprod(tmp.fit$residuals) / (nrow(obj$Z1) - ncol(obj$Z1))
-	
+
     obj$alpha <- Pi0[, 1:r, drop = FALSE]
-	
-    bEta0 <- solve(crossprod(obj$R1[, -(1:r), drop = FALSE]), 
+
+    bEta0 <- solve(crossprod(obj$R1[, -(1:r), drop = FALSE]),
                    crossprod(crossprod(obj$R0 -
                                        tcrossprod(obj$R1[, 1:r, drop = FALSE],
-                                                  obj$alpha), 
+                                                  obj$alpha),
                                        obj$R1[, -(1:r), drop = FALSE]),
-                             solve(obj$Sigma, obj$alpha))) %*% 
+                             solve(obj$Sigma, obj$alpha))) %*%
                                  solve(crossprod(obj$alpha,
                                                  solve(obj$Sigma,
                                                        obj$alpha)
                                                  )
                                        )
-		
+
     obj$call <- cl
     obj$beta <- rbind(diag(1, r), bEta0)
 
     obj	<- auxI1(obj)
     class(obj) <- 'I1gls'
-	
+
     return(obj)
 }
 
@@ -538,26 +545,26 @@ infocrit <- function(obj) {
     sm <-summary(obj)
     Time <- nrow(sm$residuals)
     logOm <- as.double(determinant(sm$Omega)$modulus)
-    sc <- as.double(logOm + (sm$p['p2'] * sm$p['p0'] + 
+    sc <- as.double(logOm + (sm$p['p2'] * sm$p['p0'] +
                              sm$rank * (sm$p['p0'] + sm$p['p1'] - sm$rank)
                              ) * log(Time) / Time)
-    hq <- as.double(logOm + (sm$p['p2'] * sm$p['p0'] + 
+    hq <- as.double(logOm + (sm$p['p2'] * sm$p['p0'] +
                              sm$rank * (sm$p['p0'] + sm$p['p1'] - sm$rank)
                              ) * 2 * log(log(Time)) / Time)
     tc <- as.double(1 - sum(diag(solve(var(obj$Z0), sm$Omega))) / sm$p['p0'])
-	
+
     return(c(SC = sc, HQ = hq, TC = tc))
 }
 
 largeres <- function(fit, abs.value) {
     res <- rstandard(fit)
-	
+
     if (missing(abs.value)) idx <- cbind(apply(abs(res), 2, which.max), seq(ncol(res)))
     else idx <- which(abs(res) > abs.value, T)
     dates <- index(res)[idx[,1]]
     variable <- apply(idx, 1, function(x) colnames(res)[x[2]])
     values <- as.matrix(res)[idx]
-	
+
     return(data.frame(dates = dates, var = variable, values = values))
 }
 
@@ -573,7 +580,7 @@ logLik.I1 <- function(object, const = TRUE, ...) {
 ### is the identity
 Null <- function(M) {
     tmp <- qr(M)
-    set <- if (tmp$rank == 0) seq_len(ncol(M))	
+    set <- if (tmp$rank == 0) seq_len(ncol(M))
     else -seq_len(tmp$rank)
     ans <- if (ncol(M) == 0) diag(nrow(M))
     else qr.Q(tmp, complete = TRUE)[, set, drop = FALSE]
@@ -598,7 +605,7 @@ print.autotest.I1 <- function(x, digits = 3, ...) {
 
 plot.eigenCompanion <- function(x, y, ...) {
     stopifnot (inherits(x, 'eigenCompanion'))
-	
+
     plot(x$values, asp = 1, xlim = c(-1, 1), ylim = c(-1, 1), xlab = 'Real', ylab = 'Imaginary')
     symbols(0, 0, circles = 1, inches = FALSE, add = TRUE)
     abline(h = 0, v = 0)
@@ -684,7 +691,7 @@ print.eigenCompanion <- function(x, ...) {
 print.I1 <- function(x, ...) {
     cat('\nCall:\n')
     cat(paste(deparse(x$call), sep = "\n", collapse = "\n"), "\n", sep = "")
-    
+
     if (ncol(x$beta) == 0)
         cat('\nModel has rank zero. No long run parameters to print\n')
     else {
@@ -696,7 +703,7 @@ print.I1 <- function(x, ...) {
 print.I1gls <- function(x, ...) {
     cat('\nCall:\n')
     cat(paste(deparse(x$call), sep = "\n", collapse = "\n"), "\n", sep = "")
-	
+
     if (is.null(x$beta))
         cat('\nModel has rank zero. No long run parameters to print\n')
     else {
@@ -708,7 +715,7 @@ print.I1gls <- function(x, ...) {
 print.I2 <- function(x, ...) {
     cat('\nCall:\n')
     cat(paste(deparse(x$call), sep = "\n", collapse = "\n"), "\n", sep = "")
-	
+
     ## if(ncol(x$beta) == 0) cat('\nModel has rank zero. No long run parameters to print\n')
     ## else
     ## {
@@ -741,7 +748,7 @@ print.summary.I1 <- function(x, ...) {
     else {
         cat('\nbeta (transposed)\n')
         print(t(x$beta))
-	
+
         cat('\nalpha:\n')
         print(coefmatrix(x$alpha, x$t.alpha), right = TRUE, quote = FALSE)
 
@@ -768,10 +775,10 @@ print.tracetest.I2 <- function(x, ...) {
     ans <- sub('\\(NA\\)', '    ', ans)
     ans	<- sub('NA', '  ', ans)
     ans	<- cbind(c(rbind(seq(nrow(x$values)) - 1, ' ')), ans)
-    ans	<- rbind(c(' ', 's2', rep('', ncol(x$values) - 1)), 
+    ans	<- rbind(c(' ', 's2', rep('', ncol(x$values) - 1)),
                  c('r', rev(seq(ncol(x$values)) - 1)), ans)
     cat('\nThe I(2) Tracetest Statistics:')
-    prmatrix(ans, right = TRUE, quote = FALSE, collab = rep('', ncol(ans)), 
+    prmatrix(ans, right = TRUE, quote = FALSE, collab = rep('', ncol(ans)),
              rowlab = rep('', nrow(ans))
              )
 }
@@ -837,7 +844,7 @@ restrictBeta <- function(obj, H.matrix) {
     else {
         for (i in seq_len(ncol(obj$beta))) {
             obj$beta[, i] <- obj$beta %*%
-                geigen(crossprod(obj$beta, H.matrix[[i]]) %*%  
+                geigen(crossprod(obj$beta, H.matrix[[i]]) %*%
                        solve(crossprod(H.matrix[[i]]),
                              crossprod(H.matrix[[i]], obj$beta)
                              ),
@@ -855,7 +862,7 @@ restrictBeta <- function(obj, H.matrix) {
                             obj$R1 %*% obj$beta[, -i, drop = F],
                             1
                             )
-		
+
             obj$beta[, i] <- H.matrix[[i]] %*% temp.rrr$beta
 
             if (i == ncol(obj$beta)) {
@@ -880,7 +887,7 @@ restrictBeta <- function(obj, H.matrix) {
         }
     }
     obj	<- auxI1(obj)
-    
+
     return(obj)
 }
 
@@ -895,13 +902,13 @@ restrictTau <- function(obj, Hmat) {
     p1 <- ncol(obj$R1)
     s1 <- ncol(obj$beta1)
     s2 <- ncol(obj$beta)
-	
+
     if (p0 - s1 - s2 > 0)
         ans <- .Fortran('tauswitch',
                         as.double(obj$R0),
                         as.double(obj$R1),
                         as.double(obj$R2),
-                        as.double(Hmat), 
+                        as.double(Hmat),
                         time = as.integer(Time),
                         as.integer(p0),
                         as.integer(p1),
@@ -915,7 +922,7 @@ restrictTau <- function(obj, Hmat) {
                         as.integer(10000), 1e-9, integer(1))
     else
         ans <- restrictBeta(update(obj, s1), Hmat)
-		
+
     obj$tau <- ans$tau
     obj$rho <- ans$rho
     obj$psi <- ans$psi
@@ -949,21 +956,21 @@ rmfilter <- function(x, coef, init) {
 rrr <- function(Z0, Z1, Z2, r) {
     Z0.loc <- as.matrix(Z0)
     Z1.loc <- as.matrix(Z1)
-    if (missing(Z2)) 
+    if (missing(Z2))
         Z2.loc <- Z2 <- NULL
     else if (is.null(Z2))
         Z2.loc <- NULL
     else
         Z2.loc <- as.matrix(Z2)
     Z <- cbind(Z0.loc, Z1.loc, Z2.loc)
-	
-    Time <- nrow(Z)	
+
+    Time <- nrow(Z)
     p0 <- ncol(Z0.loc)
     p1 <- ncol(Z1.loc)
 #	p2		<- ncol(Z2.loc)
 
     M <- crossprod(Z) / Time
-	
+
     if (is.null(Z2.loc)) {
         R0 <- Z0
         R1 <- Z1
@@ -973,15 +980,24 @@ rrr <- function(Z0, Z1, Z2, r) {
         R1 <- lm.fit(Z2, Z1)$residuals
     }
     ##	ans <- .Fortran('rrr', as.double(R0), as.double(R1), as.integer(Time),
-    ## as.integer(p0), as.integer(p1), values = double(p1), 
+    ## as.integer(p0), as.integer(p1), values = double(p1),
     ## vectors = matrix(0.0, p1, p1))
 
     ## The following is to be implemented in Fortran
-    qrR1 <- qr(R1)
-    tmpsvd <- svd(crossprod(qr.Q(qrR1), qr.Q(qr(R0))))
+    svdR0 <- svd(R0)
+    svdR1 <- svd(R1)
+    svd01 <- svd(crossprod(svdR0$u, svdR1$u))
     ans	<- list()
-    ans$values	<- tmpsvd$d^2
-    ans$vectors	<- solve(qr.R(qrR1), tmpsvd$u * sqrt(Time))
+    ans$values	<- svd01$d^2
+    ans$vectors	<- svd01$v * sqrt(Time)
+    for (i in 1:length(svdR1$d))
+    {
+        if (svdR1$d[i] > 2e-16)
+            ans$vectors[i,] <- ans$vectors[i,]/svdR1$d[i]
+        else
+            ans$vectors[i,] <- 0
+    }
+    ans$vectors <- svdR1$v%*%ans$vectors
     ans$R0 <- R0
     ans$R1 <- R1
     ans$S11 <- crossprod(R1) / Time
@@ -994,7 +1010,7 @@ rrr <- function(Z0, Z1, Z2, r) {
     return(ans)
 }
 
-rstandard.I1 <- function(model, ...) {	
+rstandard.I1 <- function(model, ...) {
     return(model$residuals / matrix(sqrt(diag(summary(model)$Omega)),
                                     nrow(model$residuals),
                                     ncol(model$residuals),
@@ -1006,7 +1022,7 @@ rstandard.I1 <- function(model, ...) {
 setrankI1 <- function(obj, r) {
     ## if (!inherits(obj, 'I1')) stop('Object must have class I1')
     ## if (!any(r %in% 0:ncol(obj$Z0))) stop('Illegal choice of rank')
-	
+
     if (r > 0) {
         obj$beta <- obj$vectors[, seq_len(r), drop = FALSE]
         obj$alpha <- t(lm.fit(obj$R1 %*% obj$beta, obj$R0)$coef)
@@ -1015,15 +1031,15 @@ setrankI1 <- function(obj, r) {
         obj$alpha <- matrix(, ncol(obj$Z0), 0)
         obj$beta <- matrix(, ncol(obj$Z1), 0)
     }
-	
+
     obj <- auxI1(obj)
     return(obj)
 }
 
-setrankI2 <- function(obj, r) {	
+setrankI2 <- function(obj, r) {
     ## Z <- with(obj, merge(Z0, Z1, Z2, Z3))
     Time <- nrow(obj$Z0)
-    
+
     if (!is.null(ncol(obj$Z3))) {
         R0 <- lm.fit(obj$Z3, obj$Z0)$residuals
         R1 <- lm.fit(obj$Z3, obj$Z1)$residuals
@@ -1048,7 +1064,7 @@ setrankI2 <- function(obj, r) {
             ft$rho <- matrix( , ncol(R0) - r[2], 0)
             ft$psi <- matrix( , ncol(R1), 0)
             ft$kappa <- matrix( , 0, ncol(R0))
-        }  
+        }
     } else {
         ## ft <- tauswitch(R0, R1, R2, r[1], r[2])
         p0 <- ncol(R0)
@@ -1089,25 +1105,25 @@ setrankI2 <- function(obj, r) {
         if (ft$iter == 0) stop('No convergence')
         if (tmpft[[17]] != 0) stop('Error in tauswitch')
     }
-	
+
     ft$R0 <- R0
     ft$R1 <- R1
     ft$R2 <- R2
     ft <- auxI2(ft, r[1])
-	
+
     ## ft$frequency <- obj$frequency
     return(ft)
 }
 
 simulate.I1 <- function(object, nsim, seed, res, init, ...) {
     stopifnot(!missing(res))
-    
+
     p <- nrow(object$alpha)
     r <- ncol(object$alpha)
     k <- object$lags
 
     A <- VAR(object)
-    
+
     if(missing(init)) init <- object$X[seq_len(k), ]
 
     eps <- as.matrix(res) +
@@ -1123,19 +1139,19 @@ simulate.I1 <- function(object, nsim, seed, res, init, ...) {
                                  )
     attributes(eps) <- attributes(res)
     ans <- rbind(init, rmfilter(eps, A, init))
-    
+
     return(ans)
 }
 
 simulate.I2 <- function(object, nsim, seed, res, init, ...) {
     stopifnot(!missing(res))
-    
+
     p <- nrow(object$alpha)
     r <- ncol(object$alpha)
     k <- object$lags
 
     A <- VAR(object)
-    
+
    	if(missing(init)) init <- object$X[seq_len(k), ]
 
     eps <- as.matrix(res) +
@@ -1156,9 +1172,9 @@ simulate.I2 <- function(object, nsim, seed, res, init, ...) {
                                          (k - 2) * p, drop = F]
                               )
     attributes(eps) <- attributes(res)
-    
+
     ans <- rbind(init, rmfilter(eps, A, init))
-    
+
     return(ans)
 }
 
@@ -1168,7 +1184,7 @@ summary.I1 <- function(object, ...) {
     p2 <- ifelse(is.null(object$Z2), 0, ncol(object$Z2))
     Time <- nrow(object$Z0)
     rank <- ncol(object$beta)
-	
+
     PI <- if (ncol(object$beta) != 0) tcrossprod(object$alpha, object$beta)
 
     OMega <- crossprod(object$residuals) / Time
@@ -1192,17 +1208,17 @@ summary.I1 <- function(object, ...) {
                                              object$S11) %*% object$beta)) / Time
                          )
 		t.aLpha	<- object$alpha / se.aLpha
-        
+
         se.PI <- sqrt(diag(OMega) %o%
-                      diag(object$beta %*% 
+                      diag(object$beta %*%
                            tcrossprod(ginv(crossprod(object$beta, object$S11) %*%
                                            object$beta), object$beta)) / Time
                       )
         t.PI <- PI / se.PI
     }
     else se.aLpha <- t.aLpha <- se.PI <- t.PI <- NULL
-	
-    ll <- -nrow(object$Z0) * 0.5 * c(determinant(OMega)$modulus) - 
+
+    ll <- -nrow(object$Z0) * 0.5 * c(determinant(OMega)$modulus) -
         Time * p0 * 0.5 * (log(2 * pi) + 1)
 
     if (!is.null(object$Z2) & !is.null(PI)) {
@@ -1211,7 +1227,7 @@ summary.I1 <- function(object, ...) {
     }
     else se.PSi <- t.PSi <- NULL
     colnames(PI)
-	
+
     tmp	<- object['call']
     tmp$beta <- object$beta
     tmp$alpha <- object$alpha
@@ -1228,24 +1244,24 @@ summary.I1 <- function(object, ...) {
     tmp$p <- c(p0 = p0, p1 = p1, p2 = p2)
     tmp$lags <- object$lags
     tmp$residuals <- object$residuals
-    
+
     class(tmp) <- 'summary.I1'
-	
+
     return(tmp)
 }
 
 summary.I2 <- function(object, ...) {
     p0 <- ncol(object$Z0)
     p1 <- ncol(object$Z1)
-    p2 <- ncol(object$Z2)	
+    p2 <- ncol(object$Z2)
     p3 <- ifelse(is.null(object$Z3), 0, ncol(object$Z3))
     Time <- nrow(object$Z0)
     object$Omega <- crossprod(object$residuals) / Time
-    object$logLik <- -nrow(object$Z0) * 0.5 * c(determinant(object$Omega)$modulus) - 
+    object$logLik <- -nrow(object$Z0) * 0.5 * c(determinant(object$Omega)$modulus) -
         Time * p0 * 0.5 * log(2 * pi * exp(1))
 
     class(object) <- 'summary.I2'
-	
+
     return(object)
 }
 
@@ -1258,30 +1274,30 @@ tauswitch <- function(R0, R1, R2, r, s2, Hmat = NULL) {
     p <- ncol(R0)
     p1 <- ncol(R1)
     s1 <- p - r - s2
-	
+
     if (!is.null(Hmat)) {
         if (nrow(Hmat) != p1 | ncol(Hmat) > p1) stop('Restriction matrix has wrong dimensions')
     }
     else Hmat <- diag(p1)
-    
+
     initest <- rrr(R0, R1%*%Hmat, NULL, r + s1)
     tAu <- Hmat%*%initest$beta
     ## if(s1 > 0) tAu <- cbind(tAu, Null(tAu)[, 1:s1])
-	
+
     ll <- -1e9
     while(1) {
-        tmp.rrr	<- geigen(crossprod(lm.fit(cbind(R2 %*% tAu, R1), R0)$res) / Time, 
+        tmp.rrr	<- geigen(crossprod(lm.fit(cbind(R2 %*% tAu, R1), R0)$res) / Time,
                           crossprod(lm.fit(R1 %*% tAu, R0)$res) /Time)
         aLpha <- crossprod(lm.fit(R1 %*% tAu, R0)$res) %*% tmp.rrr$vectors[, (p - r + 1):p, drop = FALSE] / Time
         aLpha.ort <- tmp.rrr$vectors[, 0:(p - r), drop = FALSE]
         aLpha.bar <- t(solve(crossprod(aLpha), t(aLpha)))
-	
+
         tmp1.r <- lm.fit(cbind(R0 %*% aLpha.ort, R2 %*% tAu, R1), R0 %*% aLpha.bar)
         rHo <- as.matrix(tmp1.r$coef)[(p - r + 1):(p + s1), , drop = FALSE]
         pSi <- as.matrix(tmp1.r$coef)[(p + s1 + 1):(p + p1 + s1), , drop = FALSE]
         ## NB! Division by Time us omited for simplicity
         OMega1 <- crossprod(tmp1.r$residuals)
-	
+
 	tmp2.r <- lm.fit(R1 %*% tAu, R0 %*% aLpha.ort)
         kAppa <- tmp2.r$coef
 	OMega2 <- crossprod(tmp2.r$residuals)
@@ -1291,10 +1307,10 @@ tauswitch <- function(R0, R1, R2, r, s2, Hmat = NULL) {
 	mC <- kAppa  %*% solve(OMega2, t(kAppa))
         mD <- crossprod(R1%*%Hmat)
 	mE <- (rHo %*% solve(OMega1,
-                             crossprod(aLpha.bar, 
+                             crossprod(aLpha.bar,
                                        crossprod(lm.fit(cbind(R0 %*% aLpha.ort,
                                                               R1),
-                                                        R0)$res, 
+                                                        R0)$res,
                                                  lm.fit(cbind(R0 %*% aLpha.ort,
                                                               R1), R2)$res)
                                        )
@@ -1313,7 +1329,7 @@ tauswitch <- function(R0, R1, R2, r, s2, Hmat = NULL) {
                                  ncol = ncol(Hmat)
                                  )
                           )
-	
+
         ll0 <- ll
         ll <- -0.5 * Time * c(determinant(crossprod(lm.fit(cbind(R2 %*% tAu %*% rHo +
                                                          R1 %*% pSi,
@@ -1332,38 +1348,38 @@ tauswitch <- function(R0, R1, R2, r, s2, Hmat = NULL) {
 
 testARCH <- function(obj, order) {
     if (!inherits(obj, 'I1')) stop('Object must have class I1')
-	
+
     i.k <- obj$call[['lags']]
     i.p <- ncol(obj$Z0)
     i.T <- nrow(obj$Z0)
     if (missing(order)) i.q <- i.k
     else i.q <- order
-	
+
     m.res <- na.omit(lag(xts(t(apply(resid(obj), 1, tcrossprod)), index(obj$Z0)), seq(0,i.q)))
     m.Sigma <- crossprod(lm(m.res[,1:i.p^2]~m.res[,-(1:i.p^2)])$residuals) / i.T
     m.0Sigma <- crossprod(scale(m.res[,1:i.p^2], scale = F)) / i.T
     f.R2 <- 1 - 2 / i.p / (i.p + 1) * sum(diag(ginv(m.0Sigma) %*% m.Sigma))
-		
+
     f.xts <- 0.5 * i.T * i.p * (i.p + 1) * f.R2
     d.xts <- data.frame(Distr = 'ChiSq',
                         Df = 0.25 * i.q * i.p^2 * (i.p + 1)^2,
                         Value = f.xts,
                         p.value = 1 - pchisq(f.xts, 0.25 * i.q * i.p^2 * (i.p + 1)^2)
                         )
-	
+
     f.uts <- rep(NA, i.p)
-    for (i in seq_len(i.p)) {	
+    for (i in seq_len(i.p)) {
         tmp <- na.omit(lag(obj$residuals[, i], 0:i.k))^2
         f.uts[i] <- summary(lm(tmp[, 1]~tmp[, -1]))$r.squared * (i.T - i.k)
     }
-	
+
     d.uts <- data.frame(Variable = colnames(obj$residuals),
                         Distr = 'ChiSq',
                         Df = i.k,
                         Value = f.uts,
                         p.value = 1 - pchisq(f.uts, i.k)
                         )
-	
+
     return(list(Univariate.test = d.uts, Multivariate.test = d.xts))
 }
 
@@ -1372,11 +1388,11 @@ testAutocor <- function(obj, portmanteau = TRUE, lagrange = c(1, 2)) {
     if (!is.null(obj$H.alpha))
         warning('Portmanteau test is invalid then alpha is restricted.')
     Time <- nrow(obj$Z0)
-	
+
     test <- character(0)
-	
+
     ## Portmanteau test, as in Lütkepohl (2007). Originally from Hisking (1980)
-    if (!portmanteau) { 
+    if (!portmanteau) {
         lb.value <- numeric(0)
         lb.df <- numeric(0)
     }
@@ -1387,25 +1403,25 @@ testAutocor <- function(obj, portmanteau = TRUE, lagrange = c(1, 2)) {
         for (i in seq_len(h)) {
             OMega.h <- crossprod(residuals(obj)[(1 + i):Time, ],
                                  resid(obj)[1:(Time - i), ]) / Time
-            lb.value <- lb.value + sum(diag(solve(sm$Omega, t(OMega.h)) %*% 
+            lb.value <- lb.value + sum(diag(solve(sm$Omega, t(OMega.h)) %*%
                                             solve(sm$Omega, OMega.h))) / (Time - i)
         }
-	
+
         lb.value <- lb.value * Time^2
         lb.df <- sm$p['p0']^2 * h -
             sm$p['p0']^2 * (sm$lags - 1) -
                 sm$p['p0'] * ncol(obj$beta)
     }
-	
+
     ## LM test, as in Lütkepohl (2007)
     lm.value <- numeric(0)
     lm.df <- numeric(0)
-	
+
     if (any(lagrange > 0)) {
         lagrange <- sort(lagrange)
         test <- c(test, sprintf('LM(%d)', lagrange))
         V <- with(obj, merge(xts(Z1 %*% beta, index(Z1)), Z2))
-		
+
         for (i in seq_len(max(lagrange))) {
             V <- merge(V, lag(sm$residuals, i))
             if (i %in% lagrange) {
@@ -1425,14 +1441,14 @@ testAutocor <- function(obj, portmanteau = TRUE, lagrange = c(1, 2)) {
             }
         }
     }
-	
+
     df <- c(lb.df, lm.df)
     value <- c(lb.value, lm.value)
-    
+
     ans <- data.frame(Type = test,
                       Distr = 'ChiSq',
                       Df = df,
-                      Value = value, 
+                      Value = value,
                       p.value = 1 - pchisq(value, df)
                       )
     return(ans)
@@ -1440,11 +1456,11 @@ testAutocor <- function(obj, portmanteau = TRUE, lagrange = c(1, 2)) {
 
 testExclude <- function(obj) {
     if (!inherits(obj, 'I1')) stop('Object must have class I1')
-	
+
     r.max <- ncol(obj$X) - 1
     values <- p.vals <- matrix(NA, r.max, nrow(obj$beta))
     tmp <- matrix('', 2 * r.max, nrow(obj$beta) + 2)
-	
+
     for (r in seq_len(r.max)) {
         fb <- update(obj, r)
         for (i in seq_len(nrow(obj$beta))) {
@@ -1462,15 +1478,15 @@ testExclude <- function(obj) {
 }
 
 testLagLength <- function(fit, lag.max = 8) {
-	
+
     if (class(fit) != 'I1') stop('Input must have class I1')
-    
+
     ##	m <- match(c('data', 'lags'), names(fit$call))
     Time <- nrow(fit$X) - lag.max
-    
+
     loglik <- Regr <- rep(NA, lag.max)
     infocr <- matrix(NA, lag.max, 2)
-    
+
     for (i in lag.max:1) {
         fit$call[['data']] <- if (i == lag.max) fit$X else fit$X[-seq_len(lag.max - i),]
         fit$call[['lags']] <- i
@@ -1479,18 +1495,18 @@ testLagLength <- function(fit, lag.max = 8) {
         Regr[i] <- ncol(tmp$Z1) + ifelse(is.null(tmp$Z2), 0, ncol(tmp$Z2))
         infocr[i,] <- infocrit(tmp)[1:2]
     }
-	
+
     z <- list()
-	
-    z$model.sum	<- data.frame(model = paste('VAR(', lag.max:1, ')', sep = ''), 
-                              k	= lag.max:1, 
-                              t	= Time, 
-                              Regr = rev(Regr), 
+
+    z$model.sum	<- data.frame(model = paste('VAR(', lag.max:1, ')', sep = ''),
+                              k	= lag.max:1,
+                              t	= Time,
+                              Regr = rev(Regr),
                               loglik = formatC(rev(loglik), digits = 3, format = 'f'),
                               SC = formatC(rev(infocr[,1]), digits = 3, format = 'f'),
                               HQ = formatC(rev(infocr[,2]), digits = 3, format = 'f')
                               )
-	
+
     lagtest <- data.frame()
     for (i in lag.max:1) {
         for (j in (lag.max - 1):1) {
@@ -1500,7 +1516,7 @@ testLagLength <- function(fit, lag.max = 8) {
                 type <- sprintf('ChiSqr(%i)', typetmp)
                 value <- 2 * (loglik[i] - loglik[j])
                 pvalue <- 1 - pchisq(value, typetmp)
-                
+
                 z$lagtest <- rbind(z$lagtest,
                                    data.frame(test,
                                               type,
@@ -1520,7 +1536,7 @@ testNormal <- function(obj) {
     if (inherits(obj, 'I1')) res <- resid(obj)
     else res <- obj
     ## Doornik and Hansen 2008 Oxford Bulletin of Economics and Statistics
-	
+
     i.T <- nrow(res)
     m.Omega <- crossprod(res) / i.T
     m.C <- m.Omega / sqrt(diag(m.Omega) %o% diag(m.Omega))
@@ -1528,10 +1544,10 @@ testNormal <- function(obj) {
     m.H <- l.eig.C$vectors
     m.Lamb <- diag(l.eig.C$values)
     m.u <- scale(res, scale = FALSE) %*% diag(diag(m.Omega)^(-0.5)) %*% m.H %*% tcrossprod(diag(diag(m.Lamb)^(-0.5)), m.H)
-	
+
     f.b1.sqr <- colMeans(m.u^3)
     f.b2 <- colMeans(m.u^4)
-	
+
     f.delta <- (i.T - 3) * (i.T + 1) * (i.T^2 + 15 * i.T - 4) * 6
     f.a	<- (i.T - 2) * (i.T + 5) * (i.T + 7) * (i.T^2 + 27 * i.T - 70) / f.delta
     f.c	<- (i.T - 7) * (i.T + 5) * (i.T + 7) * (i.T^2 + 2 * i.T - 5) / f.delta
@@ -1539,13 +1555,13 @@ testNormal <- function(obj) {
     f.alpha <- f.a + f.b1.sqr^2 * f.c
     f.chi <- (f.b2 - 1 - f.b1.sqr^2) * 2 * f.k
     f.z2 <- ((0.5 * f.chi / f.alpha)^(1/3) - 1 + 1 / 9 / f.alpha) * 3 * sqrt(f.alpha)
-	
+
     f.beta <- 3 * (i.T^2 + 27 * i.T - 70) * (i.T + 1) * (i.T + 3) / (i.T - 2) / (i.T + 5) / (i.T + 7) / (i.T + 9)
     f.omega2 <- -1 + sqrt(2 * (f.beta - 1))
     f.delta <- log(sqrt(f.omega2))^(-0.5)
     f.y <- f.b1.sqr * sqrt((f.omega2 - 1) * (i.T + 1) * (i.T + 3) / 12 / (i.T - 2))
     f.z1 <- f.delta * log(f.y + sqrt(f.y^2 + 1))
-	
+
     f.unorm.test <- f.z1^2 + f.z2^2
     d.unorm.test <- data.frame(Variable = colnames(res),
                                Distr = 'ChiSq',
@@ -1559,75 +1575,75 @@ testNormal <- function(obj) {
                                Value = f.mnorm.test,
                                p.value = 1 - pchisq(f.mnorm.test, 2 * ncol(m.u))
                                )
-	
-    f.skew <- skewness(res)	
+
+    f.skew <- skewness(res)
     f.kurt <- kurtosis(res)
-	
+
     d.uni.stat <- data.frame(Mean = colMeans(res),
                              Std.dev = sqrt(diag(m.Omega)),
                              Skewness = f.skew,
                              Kurtosis = f.kurt
                              )
-	
+
     ans	<- list(Univariate.test = d.unorm.test,
                 Multivariate.test = d.mnorm.test,
                 Summary.stat = d.uni.stat
                 )
-	
+
     return(ans)
 }
 
 testResiduals <- function(obj) {
     sm <- summary(obj)
     ans <- list()
-	
+
     ans$cor <- sm$Omega / sqrt(diag(sm$Omega) %o% diag(sm$Omega))
     ans$se <- sqrt(diag(sm$Omega))
-    
+
     ans$info <- infocrit(obj)
     ans$autocor <- testAutocor(obj)
     ans$normal <- testNormal(residuals(obj))
     ans$arch <- testARCH(obj)
-    
+
     return(ans)
 }
 
 testStationary <- function(obj, incl.trend = TRUE, incl.exo = TRUE, incl.sd = TRUE) {
     if(!inherits(obj, 'I1')) stop('Object must have class I1')
-	
+
     H.index <- ncol(obj$X)
     det.text <- NULL
     p1 <- ncol(obj$Z1)
-	
+
     if ('exogenous' %in% names(obj$call) && incl.exo) {
-        H.index	<- c(H.index, 1:ncol(as.matrix(obj$exogenous)) + 
+        H.index	<- c(H.index, 1:ncol(as.matrix(obj$exogenous)) +
                      H.index[length(H.index)])
         det.text <- c(det.text, 'Exogenous variables included in test\n')
         p1 <- p1 - ncol(as.matrix(obj$exogenous))
     }
-	
+
     if ('shift.dummy' %in% names(obj$call) && incl.sd) {
-        H.index	<- c(H.index, 1:ncol(as.matrix(obj$shift.dummy)) + 
+        H.index	<- c(H.index, 1:ncol(as.matrix(obj$shift.dummy)) +
                      H.index[length(H.index)])
         det.text <- c(det.text, 'Shift dummies included in test\n')
         p1 <- p1 - ncol(as.matrix(obj$shift.dummy))
     }
-	
+
     if (obj$call$dettrend != 'none' && incl.trend) {
         H.index	<- c(H.index, 1 + H.index[length(H.index)])
         det.text <- c(det.text, 'Trend included in test\n')
         p1 <- p1 - 1
     }
-	
+
     r.max <- ncol(obj$X) - 1
-	
+
     values <- p.vals <- matrix(NA, r.max, ncol(obj$X))
     tmp	<- matrix('', 2 * r.max, ncol(obj$X) + 2)
-	
+
     for (r in seq_len(r.max)) {
         fb <- eval(obj$call, envir = attr(obj$call, 'environment'))
         fb <- update(fb, r)
-		
+
         for (i in seq_len(ncol(obj$X)))	{
             H.index[1] <- i
             H <- lapply(1:r, function(x) diag(nrow(obj$beta))[,-i])
@@ -1646,12 +1662,12 @@ testStationary <- function(obj, incl.trend = TRUE, incl.exo = TRUE, incl.sd = TR
 
 testUnit <- function(obj) {
     if(!inherits(obj, 'I1')) stop('Object must have I1')
-	
+
     r.max <- ncol(obj$X) - 1
-	
+
     values <- p.vals <- matrix(NA, r.max, ncol(obj$X))
     tmp <- matrix('', 2 * r.max, nrow(obj$alpha))
-	
+
     for (r in seq_len(r.max)) {
         fb <- update(obj, r)
         for (i in seq_len(nrow(obj$alpha))) {
@@ -1664,7 +1680,7 @@ testUnit <- function(obj) {
             p.vals[r, i] <- tmp[1, 3]
         }
     }
-    
+
     colnames(values) <- colnames(obj$X)
     out <- list(df = ncol(obj$X) - 1:r.max, value = values, p.value = p.vals)
     class(out) <- 'autotest.I1'
@@ -1673,12 +1689,12 @@ testUnit <- function(obj) {
 
 testWeakexo <- function(obj) {
     if(!inherits(obj, 'I1')) stop('Object must have class I1')
-	
+
     r.max <- ncol(obj$X) - 1
-	
+
     values <- p.vals <- matrix(NA, r.max, ncol(obj$X))
     tmp	<- matrix('', 2 * r.max, nrow(obj$alpha))
-	
+
     for (r in seq_len(r.max)) {
         fb <- update(obj, r)
         for (i in seq_len(nrow(obj$alpha))) {
@@ -1771,7 +1787,7 @@ tracetest.I1 <- function(fit, type = 'I1', a.p.value = TRUE, bootstrap = FALSE, 
                 } else if (p0 < 9) {
                     tmp <- c(I2crit[I2crit$s1 == (j - i) & I2crit$s2 == (p0 - j + 1),9:10])
                     ans$p.values[i, j] <- pgamma(ans$values[i, j],
-                                                 shape = tmp$mean^2 / tmp$var, 
+                                                 shape = tmp$mean^2 / tmp$var,
                                                  scale = tmp$var / tmp$mean,
                                                  lower.tail = F
                                                  )
@@ -1789,7 +1805,7 @@ tracetest.I2 <- function(fit, type = 'I2', a.p.value = TRUE, bootstrap = FALSE, 
 tracemckinnon <- function(npr, type = c('trace', 'lambda'), dettrend = c('none', 'mean', 'drift'), tlev, tst) {
     ## Function is just an interface to McKinnons Fortran function. Remember to ask
     ## for accept of use.
-	
+
     npr <- if (is.vector(npr) & all(npr %in% 0:12)) as.integer(npr)
     else stop('npr must be a vector of integer values between 0 and 12')
     itt <- if (type == 'lambda') as.integer(1)
@@ -1811,7 +1827,7 @@ tracemckinnon <- function(npr, type = c('trace', 'lambda'), dettrend = c('none',
     }
     val <- numeric(1)
     rpath <- system.file(package='civecm')
-	
+
     if (nc == 1) {
         ans <- matrix(NA, length(npr), length(arg))
         colnames(ans) <- paste('Cr', substr(arg, 2, 5), sep = '')
@@ -1868,7 +1884,7 @@ VAR <- function(object, ...) UseMethod('VAR')
 
 VAR.I1 <- function(object, ...) {
     p <- ncol(object$X)
-    
+
     A <- array(0, c(p, p, object$lags))
     A[,,1] <- with(object, diag(p) + tcrossprod(alpha, beta[seq_len(p),, drop = FALSE]))
     for (i in seq_len(object$lags - 1)) {
@@ -1890,7 +1906,7 @@ VAR.I2 <- function(object, ...) {
                      tcrossprod(zeta, tau[seq_len(p), ]))
     A[, , 2] <- with(object, -(diag(p) + tcrossprod(alpha, delta[seq_len(p), ]) +
                   tcrossprod(zeta, tau[seq_len(p), ])))
-    
+
     for (i in seq_len(max(object$lags - 2, 0))) {
         A[, , i] <- A[, , i] + object$Psi[, seq_len(p) + (i - 1) * p]
         A[, , i + 1] <- A[, , i + 1] - 2 * object$Psi[, seq_len(p) + (i - 1) * p]
@@ -1904,7 +1920,7 @@ VAR.I2 <- function(object, ...) {
 VECM <- function(data, lags, dettrend, rank, season, dummy, exogenous, method = 'rrr') {
     cl <- match.call()
     mf <- match.call()
-    
+
     m <- match(c('data', 'dummy', 'exogenous'), names(mf), 0L)
     if (any(missing(data), missing(lags), missing(dettrend))) stop('The arguments data, lags and dettrend are required')
     ## if (!inherits(data, 'xts')) stop('Data must be of class xts')
@@ -1923,7 +1939,7 @@ VECM <- function(data, lags, dettrend, rank, season, dummy, exogenous, method = 
 
     mf[[1L]] <- as.name("CIModelFrame")
     mf <- eval(mf, parent.frame())
-        
+
     if (missing(rank)) {
         ft <- rrr(mf$Z0, mf$Z1, mf$Z2, ncol(mf$Z0))
         ft$lags <- lags
@@ -1945,7 +1961,7 @@ VECM <- function(data, lags, dettrend, rank, season, dummy, exogenous, method = 
     ft$call <- cl
     attr(ft$call, 'environment') <- parent.frame()
     ft$X <- mf$X
-        
+
     return(ft)
 }
 
