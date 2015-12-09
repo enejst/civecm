@@ -7,6 +7,10 @@
 # The tracetest p-values has been stolen from McKinnon and I need to ask him
 # in case I need to redistribute this code.
 #
+# Date 09/12/2015
+# Emil Nejstgaard takes over development.
+#
+
 
 anova.I1 <- function(object, ..., df) {
     if(length(objects <- list(object, ...)) == 1) stop('Nothing to test against')
