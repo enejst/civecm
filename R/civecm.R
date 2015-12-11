@@ -6,11 +6,12 @@
 # Notes:
 # The tracetest p-values has been stolen from McKinnon and I need to ask him
 # in case I need to redistribute this code.
+#  - We will simulate our own!
 #
 # Date 09/12/2015
-# Emil Nejstgaard takes over development.
+# Development taken over by Emil Nejstgaard
 #
-
+#
 
 anova.I1 <- function(object, ..., df) {
     if(length(objects <- list(object, ...)) == 1) stop('Nothing to test against')
@@ -22,28 +23,27 @@ anova.I1 <- function(object, ..., df) {
            )
 }
 
-auxI1 <- function(ft)
-{
+auxI1 <- function(ft) {
     if (ncol(ft$beta) > 0)
     {
-        colnames(ft$beta) <- paste('beta(', 1:ncol(ft$beta), ')', sep = '')
+        colnames(ft$beta)  <- paste('beta(', 1:ncol(ft$beta), ')', sep = '')
         colnames(ft$alpha) <- paste('alpha(', 1:ncol(ft$alpha), ')', sep = '')
     }
-    rownames(ft$beta) <- colnames(ft$Z1)
+    rownames(ft$beta)  <- colnames(ft$Z1)
     rownames(ft$alpha) <- colnames(ft$Z0)
 
     if (!is.null(ft$Z2))
     {
-        tmpfit <- with(ft, lm.fit(Z2, Z0 - Z1 %*% tcrossprod(beta, alpha)))
-        ft$Psi <- t(tmpfit$coef)
+        tmpfit           <- with(ft, lm.fit(Z2, Z0 - Z1 %*% tcrossprod(beta, alpha)))
+        ft$Psi           <- t(tmpfit$coef)
         colnames(ft$Psi) <- colnames(ft$Z2)
         ft$fitted.values <- xts(tmpfit$fitted.values, index(ft$Z0))
-        ft$residuals <- xts(tmpfit$residuals, index(ft$Z0))
+        ft$residuals     <- xts(tmpfit$residuals, index(ft$Z0))
     }
     else
     {
         ft$fitted.values <- with(ft, as.xts(Z1 %*% tcrossprod(beta, alpha), index(Z0)))
-        ft$residuals <- with(ft, as.xts(Z0 - fitted.values, index(Z0)))
+        ft$residuals     <- with(ft, as.xts(Z0 - fitted.values, index(Z0)))
     }
 
     colnames(ft$residuals) <- colnames(ft$Z0)
@@ -298,135 +298,6 @@ CIModelFrame <- function(data, lags, dettrend, rank, season = FALSE, exogenous, 
 
     return(tmp)
 }
-
-## Fractional cointegration setup
-## CIModelFrame	<-	function(data, lags, dettrend, model = c(d = 1, b = 1), poly.coint = FALSE, season = NULL, dummy = NULL, exogenous = NULL, ...)
-# {
-# 	X <- data
-# 	if (is.null(colnames(X))) colnames(X) <- paste('X',seq(ncol(X)),sep='.')
-# 	Time <- nrow(X) - lags
-# 	d <- model[1]
-# 	b <- model[2]
-
-#     if (is.null(exogenous)) W <- l.d.W <- l.d2.W <- NULL
-#     else if (any(model != 1)) stop('Model with exogenous varibles in fractional processes not handled yet.')
-# 	else {
-# 		W <- exogenous
-# 		p.W <- ifelse(is.matrix(W), ncol(W), 1)
-# 		l.d.W <- lag(diff(W), -(0:lags))
-# 		if (is.null(colnames(W))) {
-# 			dim(W) <- ifelse(is.null(dim(W)), c(Time, 1), dim(W))
-# 			colnames(W) <- paste('exo', 1:p.W, sep = '.')
-# 		}
-# 		colnames(l.d.W) <- paste('.l.', rep(1:lags, each = p.W), 'd', colnames(W), sep ='')
-# 		l.d2.W <- diff(l.d.W)
-# 		colnames(l.d2.W) <- paste('l', rep(1:lags, each = p.W), '.d2.', colnames(W), sep ='')
-# 	}
-
-# 	if (!is.null(season)) {
-# 		season <- ts(season * model.matrix(~factor(rep(1:season, length = Time)) - 1)
-#                      - 1, end = end(X), freq = frequency(X))[, -season]
-# 		colnames(season) <- paste('Csea', 1:ncol(season), sep = '.')
-# 	}
-
-# 	Dr	<- merge(W, switch(dettrend,
-#                                   none = NULL,
-#                                   mean = ts(c(rep(0, lags), rep(1, Time)), end = end(X),
-#                                     freq = frequency(X)), drift = ts(c(rep(0, lags), seq(Time)),
-#                                                             end = end(X), freq = frequency(X))))
-# 	if(!is.null(dim(Dr))) {
-# 		colnames(Dr) <- c(colnames(Dr), ifelse(dettrend != 'none', dettrend, NULL))
-# 	}
-# 	else if (!is.null(Dr)) {
-# 		dim(Dr)	<- c(nrow(X), 1)
-# 		colnames(Dr) <- dettrend
-# 	}
-
-# 	d.X <- fracdiff(X, d)
-# 	colnames(d.X) <- paste('dd', colnames(X), sep = '.')
-# 	bl.X <- X - fracdiff(X, b)
-# 	if(b == d) db.bl.X	<- bl.X
-# 	else if(b < d) db.bl.X	<- fracdiff(bl.X, d - b)
-# 	else stop('Illega choice of b and d')
-# 	colnames(db.bl.X) <- colnames(X)
-
-# 	if (!poly.coint) {
-# 		if(lags == 1) l.dd.bl.X	<- NULL
-# 		else {
-# 			l.dd.bl.X <- lag(fracdiff(bl.X, d), -(0:(lags - 2)))
-# 			colnames(l.dd.bl.X) <- paste('l', rep(1:(lags - 1), each = ncol(X)),
-#                                          '.d.', colnames(X), sep = '')
-# 		}
-# 		Du <- merge(l.d.W, dummy, season
-#                            , switch (dettrend,
-#                                     none = NULL,
-#                                     mean = NULL,
-#                                     drift = ts(rep(1, Time), end = end(X), freq = frequency(X))))
-# 		if (!is.null(dim(Du))) {
-# 			colnames(Du) <- c(colnames(Du)[-length(colnames(Du))], ifelse(dettrend != 'none', 'const', NULL))
-# 		}
-# 		else if (!is.null(Du)) {
-# 			dim(Du)	<- c(Time, 1)
-# 			colnames(Du) <- 'const'
-# 		}
-
-# 		## Collect all Z's to get the timing and sample correct
-# 		Ztmp <- na.omit(merge(d.X, db.bl.X, Dr, l.dd.bl.X, Du))
-# 		colnames(Ztmp) <- unlist(sapply(list(d.X, db.bl.X, Dr, l.dd.bl.X, Du), colnames))
-
-# 		tmp	<- list()
-# 		tmp$X <- X
-# 		tmp$Z0 <- Ztmp[,colnames(d.X), drop = F]
-# 		tmp$Z1 <- Ztmp[,c(colnames(db.bl.X), colnames(Dr)), drop = F]
-# 		tmp$Z2 <- if (!all(is.null(l.dd.bl.X), is.null(Du))) Ztmp[,c(colnames(l.dd.bl.X),
-#                                                                      colnames(Du)), drop = F]
-#         else NULL
-# 		class(tmp) <- 'model.frame.I1'
-# 	}
-# 	else {
-# 		l.d.X <- lag(diff(X), -1)
-# 		colnames(l.d.X) <- paste('l', '.d.', colnames(X), sep = '')
-# 		d2.X <- diff(d.X)
-# 		colnames(d2.X) <- paste('d2', colnames(X), sep = '.')
-# 		if (lags == 1) stop('In the I(2) model there must be at least two lags')
-# 		else if (lags == 2) l.d2.X <- NULL
-# 		else {
-# 			l.d2.X <- lag(diff(X, diff = 2), -(1:(lags - 2)))
-# 			colnames(l.d2.X) <- paste('l', rep(1:(lags - 2), each = ncol(X)), '.d2.', colnames(X), sep = '')
-# 		}
-# 		if (!is.null(Dr)) {
-# 			d.Dr <- diff(Dr)
-# 			colnames(d.Dr) <- paste('d', colnames(Dr), sep = '.')
-# 		}
-# 		else d.Dr <- NULL
-
-# 		Du <- merge(l.d2.W, dummy, season)
-# 		if (!is.null(dim(Du))) {
-# 			colnames(Du) <- c(colnames(Du)[-length(colnames(Du))], ifelse(dettrend != 'none', 'const', NULL))
-# 		}
-# 		else if (!is.null(Du)) {
-# 			dim(Du)	<- c(Time, 1)
-# 			colnames(Du) <- 'trend'
-# 		}
-
-# 		## Collect all Z's to get the timing and sample correct
-# 		Ztmp <- na.omit(merge(d2.X, l.d.X, d.Dr, bl.X, Dr, l.d2.X, Du))
-# 		colnames(Ztmp) <- unlist(sapply(list(d2.X, l.d.X, d.Dr, bl.X, Dr, l.d2.X, Du), colnames))
-
-# 		tmp	<- list()
-# 		tmp$X <- X
-# 		tmp$Z0 <- Ztmp[, colnames(d2.X), drop = F]
-# 		tmp$Z1 <- Ztmp[, c(colnames(l.d.X), colnames(d.Dr)), drop = FALSE]
-# 		tmp$Z2 <- Ztmp[, c(colnames(bl.X), colnames(Dr)), drop = FALSE]
-# 		tmp$Z3 <- if (!all(is.null(l.d2.X), is.null(Du))) Ztmp[,c(colnames(l.d2.X), colnames(Du)), drop = FALSE]
-#         else NULL
-# 		class(tmp) <- 'model.frame.I2'
-# 	}
-
-# 	tmp$frequency <- frequency(Ztmp)
-
-# 	return(tmp)
-# }
 
 ## A function to print matrices of coefficient estimates with se og t.values
 coefmatrix <- function(coef, stat1, digits = 3, sig.dig = c(TRUE, FALSE)) {
@@ -1888,7 +1759,6 @@ VAR <- function(object, ...) UseMethod('VAR')
 
 VAR.I1 <- function(object, ...) {
     p <- ncol(object$X)
-
     A <- array(0, c(p, p, object$lags))
     A[,,1] <- with(object, diag(p) + tcrossprod(alpha, beta[seq_len(p),, drop = FALSE]))
     for (i in seq_len(object$lags - 1)) {
@@ -1922,6 +1792,15 @@ VAR.I2 <- function(object, ...) {
 }
 
 VECM <- function(data, lags, dettrend, rank, season, dummy, exogenous, method = 'rrr') {
+    # Function that creates a Vector Error Correction Model (VECM) object.
+    #
+    # Args:
+    #   data: An xts object containing the data to be analyzed 
+    #   lags: the number of lags in levels
+    #
+    #
+  
+  
     cl <- match.call()
     mf <- match.call()
 
@@ -1932,7 +1811,7 @@ VECM <- function(data, lags, dettrend, rank, season, dummy, exogenous, method = 
     if (!any(lags %in% seq(12))) stop ('The model must have lags between 1 and 12')
     ## if (!missing(exogenous)) {
     ##     if (!inherits(exogenous, 'xts')) stop('Exogenous variables must be of class
-	## 	 xts')
+	  ## 	 xts')
     ##     if (sum(is.na(exogenous))) stop('Exogenous variables contains NAs')
     ## }
     ## if (!missing(dummy)) {
@@ -1942,29 +1821,29 @@ VECM <- function(data, lags, dettrend, rank, season, dummy, exogenous, method = 
     ## if (!dettrend %in% c('none', 'mean', 'drift')) stop('The determistic specification must be either none, mean or drift')
 
     mf[[1L]] <- as.name("CIModelFrame")
-    mf <- eval(mf, parent.frame())
+    mf       <- eval(mf, parent.frame())
 
     if (missing(rank)) {
-        ft <- rrr(mf$Z0, mf$Z1, mf$Z2, ncol(mf$Z0))
+        ft      <- rrr(mf$Z0, mf$Z1, mf$Z2, ncol(mf$Z0))
         ft$lags <- lags
-        ft <- auxI1(ft)
+        ft      <- auxI1(ft)
     }
     else if (length(rank) == 1) {
-        ft <- rrr(mf$Z0, mf$Z1, mf$Z2, ncol(mf$Z0))
+        ft      <- rrr(mf$Z0, mf$Z1, mf$Z2, ncol(mf$Z0))
         ft$lags <- lags
-        ft <- setrankI1(ft, rank)
+        ft      <- setrankI1(ft, rank)
     }
     else if (length(rank) == 2) {
         ## if (!(cl[['dettrend']] %in% c('none', 'drift'))) stop('Deterministic specification must me either none og drift')
         if (lags < 2) stop('There must be at least tow lags in the model')
         mf$lags <- lags
-        ft <- setrankI2(mf, rank)
+        ft      <- setrankI2(mf, rank)
     }
     else stop('Illegal choice of rank')
 
     ft$call <- cl
     attr(ft$call, 'environment') <- parent.frame()
-    ft$X <- mf$X
+    ft$X    <- mf$X
 
     return(ft)
 }
