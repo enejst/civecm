@@ -461,6 +461,63 @@ eigen.I1 <- function(object, ...) {
     return(out)
 }
 
+hessian <- function(obj) {
+  # Calculates the covariance matrix for the parameter
+  # estimates given restrictions imposed through the function
+  # restrictLongRun
+  #
+  # Args:
+  #   obj: an object of type I1
+  #
+  # Return
+  #   covarList: a list with covariance matrices and 
+  #
+  
+  p0     <- ncol(obj$Z0)
+  p1     <- ncol(obj$Z1)
+  p2     <- ifelse(is.missing(obj$Z2) || is.null(obj$Z2), NULL, ncol(obj$Z2))
+  r      <- obj$rank
+  G      <- ifelse(is.missing(obj$Ha), diag(p0*r), obj$Ha)   
+  H      <- ifelse(is.missing(obj$Hb), diag(p1*r), obj$Hb)
+  alpha  <- obj$alpha
+  beta   <- obj$beta
+  Omega  <- obj$Omega
+  iOmega <- solve(Omega)
+  T      <- nrow(obj$Z1)
+  S11    <- obj$M[(p0+1):(p0+p1),(p0+1):(p0+p1)]
+  
+  hessian_11 <- t(G) %*% kronecker(iOmega, crossprod(beta,S11) %*% beta) %*% G
+  hessian_12 <- t(G) %*% kronecker(iOmega %*% alpha, crossprod(beta,S11)) %*% H 
+  hessian_22 <- t(H) %*% kronecker(crossprod(alpha,iOmega) %*% S11) %*% H
+  
+  hessian <- T * rbind(cbind(hessian_11,hessian_12),
+                       cbind(hessian_21,hessian_22))
+  
+  urHessian_11 <- kronecker(iOmega, crossprod(beta,S11) %*% beta)
+  urHessian_12 <- kronecker(iOmega %*% alpha, crossprod(beta,S11))
+  urHessian_22 <- kronecker(crossprod(alpha,iOmega) %*% S11)
+  
+  urHessian <- T * rbind(cbind(urHessian_11,urHessian_12),
+                         cbind(urHessian_21,urHessian_22))
+  
+  sdPsi   <- sqrt(diag(hessian[ncol(G),ncol(G)]))
+  sdPhi   <- sqrt(diag(hessian[ncol(H),ncol(H)]))
+  sdAlpha <- t(matrix(sdPsi,nrow=r,ncol=p0))
+  sdBeta  <- matrix(sdPhi,nrow=p0,ncol=r)
+  
+  covarList           <- list(hessian=hessian)
+  covarList$iHessian  <- solve(hessian)
+  covarList$urHessian <- urHessian
+  covarList$sdPI      <- sqrt(diag(urHessian))
+  covarList$sePi      <- covarList$sdPI / sqrt(T)
+  covarList$sdAlpha   <- sdAlpha
+  covarList$sdBeta    <- sdBeta
+  covarList$seAlpha   <- sdAlpha / sqrt(T)
+  covarList$seBeta    <- sdBeta / sqrt(T)
+  
+  return(covarList)
+}
+
 I1gls <- function(obj, r) {
     ## Lütkepol's two step procedure for estimating the cointegrting relations
     cl <- match.call()
