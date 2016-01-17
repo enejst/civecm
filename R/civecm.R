@@ -312,8 +312,9 @@ CIModelFrame <- function(data, lags, dettrend, rank, season = FALSE, exogenous, 
   return(tmp)
 }
 
-## A function to print matrices of coefficient estimates with se og t.values
 coefmatrix <- function(coef, stat1, digits = 3, sig.dig = c(TRUE, FALSE)) {
+    # A function to print matrices of coefficient estimates with se og t.values
+  
     m.coef <- as.matrix(coef)
     m.stat1 <- as.matrix(stat1)
     mchar <- max(nchar(cbind(m.coef, m.stat1)))
@@ -585,9 +586,10 @@ logLik.I1 <- function(object, const = TRUE, ...) {
     return(ll)
 }
 
-### Function borrowed from MASS but with here is the convention that the Null of a zero column matrix
-### is the identity
 Null <- function(M) {
+    # Function borrowed from MASS but with here is the convention that the Null of a zero column matrix
+    # is the identity
+  
     tmp <- qr(M)
     set <- if (tmp$rank == 0) seq_len(ncol(M))
     else -seq_len(tmp$rank)
@@ -1387,15 +1389,15 @@ tauswitch <- function(R0, R1, R2, r, s2, Hmat = NULL) {
         ## NB! Division by Time us omited for simplicity
         OMega1 <- crossprod(tmp1.r$residuals)
 
-	tmp2.r <- lm.fit(R1 %*% tAu, R0 %*% aLpha.ort)
+	      tmp2.r <- lm.fit(R1 %*% tAu, R0 %*% aLpha.ort)
         kAppa <- tmp2.r$coef
-	OMega2 <- crossprod(tmp2.r$residuals)
+	      OMega2 <- crossprod(tmp2.r$residuals)
 
         mA <- rHo %*% solve(OMega1, t(rHo))
-	mB <- crossprod(lm.fit(cbind(R0 %*% aLpha.ort, R1), R2)$res%*%Hmat)
-	mC <- kAppa  %*% solve(OMega2, t(kAppa))
+	      mB <- crossprod(lm.fit(cbind(R0 %*% aLpha.ort, R1), R2)$res%*%Hmat)
+	      mC <- kAppa  %*% solve(OMega2, t(kAppa))
         mD <- crossprod(R1%*%Hmat)
-	mE <- (rHo %*% solve(OMega1,
+	      mE <- (rHo %*% solve(OMega1,
                              crossprod(aLpha.bar,
                                        crossprod(lm.fit(cbind(R0 %*% aLpha.ort,
                                                               R1),
