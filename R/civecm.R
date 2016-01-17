@@ -26,29 +26,30 @@ anova.I1 <- function(object, ..., df) {
 auxI1 <- function(ft) {
     if (ncol(ft$beta) > 0)
     {
-        colnames(ft$beta)  <- paste('beta(', 1:ncol(ft$beta), ')', sep = '')
-        colnames(ft$alpha) <- paste('alpha(', 1:ncol(ft$alpha), ')', sep = '')
+      colnames(ft$beta)  <- paste('beta(', 1:ncol(ft$beta), ')', sep = '')
+      colnames(ft$alpha) <- paste('alpha(', 1:ncol(ft$alpha), ')', sep = '')
     }
     rownames(ft$beta)  <- colnames(ft$Z1)
     rownames(ft$alpha) <- colnames(ft$Z0)
-
+    
     if (!is.null(ft$Z2))
     {
-        tmpfit           <- with(ft, lm.fit(Z2, Z0 - Z1 %*% tcrossprod(beta, alpha)))
-        ft$Psi           <- t(tmpfit$coef)
-        colnames(ft$Psi) <- colnames(ft$Z2)
-        ft$fitted.values <- xts(tmpfit$fitted.values, index(ft$Z0))
-        ft$residuals     <- xts(tmpfit$residuals, index(ft$Z0))
+      tmpfit           <- with(ft, lm.fit(Z2, Z0 - Z1 %*% tcrossprod(beta, alpha)))
+      ft$Psi           <- t(tmpfit$coef)
+      colnames(ft$Psi) <- colnames(ft$Z2)
+      ft$fitted.values <- xts(tmpfit$fitted.values, index(ft$Z0))
+      ft$residuals     <- xts(tmpfit$residuals, index(ft$Z0))
     }
     else
     {
-        ft$fitted.values <- with(ft, as.xts(Z1 %*% tcrossprod(beta, alpha), index(Z0)))
-        ft$residuals     <- with(ft, as.xts(Z0 - fitted.values, index(Z0)))
+      ft$fitted.values <- with(ft, as.xts(Z1 %*% tcrossprod(beta, alpha), index(Z0)))
+      ft$residuals     <- with(ft, as.xts(Z0 - fitted.values, index(Z0)))
     }
-
+  
+    ft$Omega               <- crossprod(ft$residuals) / nrow(ft$residuals)
     colnames(ft$residuals) <- colnames(ft$Z0)
     class(ft$residuals)    <- c('I1res', class(ft$residuals))
-
+  
     class(ft) <- 'I1'
     return(ft)
 }
@@ -840,6 +841,86 @@ restrictBeta <- function(obj, H.matrix) {
     obj	<- aux.I1(obj)
 
     return(obj)
+}
+
+restrictLongRun <- function(obj,Hb,hb,Ha,alpha_i,beta_i) {
+  # Function that restricts both subelements of the long run matrix
+  # The function applies the general Boswijk/Doornik principle for
+  # imposing linear restrictions on the long run parameters.
+  # See Boswijk and Doornik (2004) : "Identifying, Estimating and
+  # Testing restricted cointegration systems"
+  #
+  # Args
+  #   obj: an I1 object with restricted parameter estimates
+  #   Hb: matrix with linear restrictions on vec(beta)
+  #   hb: a vector of corresponding fixed parameter values
+  #   Ha: matrix with linear restrictions on vec(alpha)
+  #   alpha_i: a matrix with initial values for alpha
+  #   beta_i: a matrix with initial values for beta
+  #
+  # Returns
+  #   obj: an object of type I1  
+  #
+  
+  p0            <- ncol(obj$Z0)
+  p1            <- ncol(obj$Z1)
+  p2            <- ifelse(is.null(obj$Z2), 0, ncol(obj$Z2))
+  p             <- p0
+  r             <- ncol(alpha_i)
+  p1            <- nrow(beta_i)
+  obj_i         <- obj
+  obj_i$alpha   <- alpha_i
+  obj_i$beta    <- beta_i
+  obj_i         <- auxI1(obj_i)
+  obj_i$Hb      <- Hb
+  obj_i$hb      <- hb
+  obj_i$Ha      <- Ha
+  S11           <- obj_i$M[(p0+1):(p0+p1),(p0+1):(p0+p1),drop=F]
+  S01           <- obj_i$M[(1:p0),(p0+1):(p0+p1),drop=F]
+  S00           <- obj_i$M[(1:p0),(1:p0),drop=F]
+  alpha_prime_i <- t(alpha_i)  
+  PI_hat_LS     <- solve(S11,t(S01))
+  Omega_i       <- (S00 - S01 %*% tcrossprod(beta_i,alpha_i) 
+                    - t(S01 %*% tcrossprod(beta_i,alpha_i))
+                    + tcrossprod(alpha_i,beta_i) %*% S11 %*% tcrossprod(beta_i,alpha_i))
+  invOmega_i    <- solve(Omega_i)
+  
+  loglik_i      <- logLik(obj_i)
+  loglik_1      <- loglik_i - 1
+  
+  i <- 1
+  while( (loglik_i - loglik_1) > 1e-6 && i < 10000) {
+    # Reset loglikelihood
+    loglik_1 <- loglik_i
+    
+    # Estimate alpha
+    psi_i          <- solve(crossprod(Ha, kronecker(invOmega_i,t(beta_i) %*% S11 %*% beta_i) %*% Ha), 
+                            crossprod(Ha, kronecker(invOmega_i,t(beta_i) %*% S11))) %*% vec(PI_hat_LS)
+    valpha_prime_i <- Ha %*% psi_i
+    alpha_prime_i  <- matrix(valpha_prime_i,ncol=p)
+    alpha_i        <- t(alpha_prime_i)
+    
+    # Estimate beta
+    phi_i   <- solve(crossprod(Hb, kronecker(crossprod(alpha_i,invOmega_i %*% alpha_i),S11) %*% Hb),
+                     crossprod(Hb, kronecker(crossprod(alpha_i,invOmega_i),S11))) %*% (vec(PI_hat_LS) - kronecker(alpha_i,diag(p1)) %*% hb)
+    vbeta_i <- Hb %*% phi_i + hb
+    beta_i  <- matrix(vbeta_i,ncol=r)
+    
+    # Estimate Omega
+    Omega_i    <- (S00 - S01 %*% tcrossprod(beta_i,alpha_i) - t(S01 %*% tcrossprod(beta_i,alpha_i))
+                   + tcrossprod(alpha_i,beta_i) %*% S11 %*% tcrossprod(beta_i,alpha_i))
+    invOmega_i <- solve(Omega_i)
+    
+    # Calculate likelihood
+    obj_i$alpha <- alpha_i
+    obj_i$beta  <- beta_i
+    
+    obj_i    <- auxI1(obj_i)
+    loglik_i <- logLik(obj_i)
+    i        <- i + 1
+  }
+  obj <- auxI1(obj_i);
+  return(obj)
 }
 
 restrictTau <- function(obj, Hmat) {
