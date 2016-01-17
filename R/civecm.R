@@ -47,27 +47,27 @@ auxI1 <- function(ft) {
     }
 
     colnames(ft$residuals) <- colnames(ft$Z0)
-    class(ft$residuals) <- c('I1res', class(ft$residuals))
+    class(ft$residuals)    <- c('I1res', class(ft$residuals))
 
     class(ft) <- 'I1'
     return(ft)
 }
 
 auxI2 <- function(ft, r) {
-    p0 <- ncol(ft$R0)
-    p1 <- ncol(ft$R1)
+    p0   <- ncol(ft$R0)
+    p1   <- ncol(ft$R1)
     Time <- nrow(ft$R0)
-    s1 <- if (is.null(ft$tau)) 0
+    s1   <- if (is.null(ft$tau)) 0
     else ncol(ft$tau) - r
-    s2 <- p0 - r - s1
-    ft$beta <- ft$tau %*% ft$rho
-    kSi <- -crossprod(ft$kappa, Null(ft$rho))
-    eTa	<- crossprod(Null(ft$beta), ft$tau %*% Null(ft$rho))
+    s2       <- p0 - r - s1
+    ft$beta  <- ft$tau %*% ft$rho
+    kSi      <- -crossprod(ft$kappa, Null(ft$rho))
+    eTa	     <- crossprod(Null(ft$beta), ft$tau %*% Null(ft$rho))
     ft$delta <-	tcrossprod(Null(ft$tau)) %*% ft$psi
-    tmpfit <- lm.fit(cbind(ft$R2 %*% ft$beta + ft$R1 %*% ft$delta, ft$R1 %*% ft$tau), ft$R0)
-    tmpcoef <- t(matrix(tmpfit$coef, 2 * r + s1, p0))
+    tmpfit   <- lm.fit(cbind(ft$R2 %*% ft$beta + ft$R1 %*% ft$delta, ft$R1 %*% ft$tau), ft$R0)
+    tmpcoef  <- t(matrix(tmpfit$coef, 2 * r + s1, p0))
     ft$alpha <-	tmpcoef[, seq_len(r), drop = FALSE]
-    ft$zeta <- tmpcoef[, seq(r + 1, 2 * r + s1, len = r + s1), drop = FALSE]
+    ft$zeta  <- tmpcoef[, seq(r + 1, 2 * r + s1, len = r + s1), drop = FALSE]
 
     if (!is.null(ncol(ft$Z3))) {
         ft$Psi <- t(lm.fit(ft$Z3, ft$Z0 - tcrossprod(ft$Z2 %*% ft$beta +
@@ -161,142 +161,154 @@ boot <- function(bootfct, obj, reps, wild = TRUE, cluster = NULL) {
     return(ans)
 }
 
-CIModelFrame <- function(data, lags, dettrend, rank, season = FALSE, exogenous, dummy, ...) {
-    X <- try.xts(data)
-    if (is.null(colnames(X))) colnames(X) <- paste('X', seq(ncol(X)), sep='.')
-    k <- lags
-    fullSampleVec <- index(X)
-    fullSample <- paste(format(as.POSIXct(first(fullSampleVec)), '%Y-%m-%d'),
-                        format(as.POSIXct(last(fullSampleVec)), '%Y-%m-%d'),
-                        sep = '/')
-    effectiveSample <- paste(format(as.POSIXct(first(fullSampleVec[-seq_len(k)])), '%Y-%m-%d'),
-                             format(as.POSIXct(last(fullSampleVec)), '%Y-%m-%d'),
-                             sep = '/')
-    Time <- nrow(X) - k
-    if (dettrend == 0) {
-        xtsTime <- xts(c(rep(0, k), rep(1, Time)), fullSampleVec)
-        colnames(xtsTime) <- 'constant'
-    }
-    else if(dettrend > 0) {
-        xtsTime <- xts(cbind(1, poly(seq_len(Time + k), dettrend, raw = T)), fullSampleVec)
-        colnames(xtsTime) <- c('constant', 'linear', 'quadratic', 'cubic', ifelse(dettrend > 3, NULL, paste('poly', seq(4, dettrend), sep = '.')))[seq_len(dettrend + 1)]
-    }
 
-    if (missing(exogenous)) W <- l.d.W <- l.d2.W <- NULL
+CIModelFrame <- function(data, lags, dettrend, rank, season = FALSE, exogenous, ...) {
+  # Function that creates a model.frame object. Either I1 or I2. 
+  # 
+  # Args:
+  #   data: an xts object with data for analysis
+  #   lags: number of lags in the model
+  #   dettrend: specified the deterministic trend structure
+  #       - none
+  #       - mean
+  #       - urmean
+  #       - drift
+  #       - qtrend
+  #   rank: cointegration rank
+  #   season: Boolean for seasonals, month and quarter provided
+  #   exogenous: an xts object with exogenous variables (Optional)
+  #       (Note - exogenous varibles are treatet as standard variables in
+  #       with regard to lagging and differencing. Only they are not
+  #       included on the left hand side in the VAR equation.)
+  #       Dummy variables should be included through the exogenous variables.
+  #     
+  # Return:
+  #   model.frame Object
+  #     - model.frame.I1 (central object for I1 models)
+  #     - model.frame.I2 (central object for I2 models)
+  #
+  
+  k               <- lags
+  X               <- try.xts(data)
+  if (is.null(colnames(X))) colnames(X) <- paste('X', seq(ncol(X)), sep='.')
+  
+  fullSampleVec   <- index(X)
+  effectiveSample <- fullSampleVec[-seq_len(k)]
+  Time <- nrow(X) - k
+  
+  # Check if exogenous variables have been provided
+  if (missing(exogenous)) W <- l.W <- l.d.W <- l.d2.W <- NULL
+  else {
+    W <- try.xts(exogenous)
+    if (is.null(colnames(W))) colnames(W) <- paste('exo', seq_len(ncol(W)), sep = '.')
+    
+    if(k == 1) {
+      l.W           <- lag(W)
+      colnames(l.W) <- colnames(W)
+      l.d.W         <- NULL
+    }
     else {
-        W <- try.xts(exogenous)
-        if (is.null(colnames(W))) colnames(W) <- paste('exo', seq_len(ncol(W)), sep = '.')
+      l.W             <- lag(W)
+      colnames(l.W)   <- colnames(W)
+      d.W             <- diff(W,1)
+      l.d.W           <- lag(d.W, seq(k - 1))
+      colnames(l.d.W) <- paste('l',
+                               rep(seq(k - 1), each = ncol(W)),
+                               '.',
+                               colnames(d.W),
+                               sep = '')
     }
-
-
-    if (!season) Season <- NULL
+  }
+  
+  # Construct deterministic trends
+  trendList <- dettrendbuild(fullSampleVec,lags,dettrend)
+  l.detTrend <- trendList[["l.detTrend"]]
+  l.d.detTrend <- trendList[["l.d.detTrend"]]
+  l.d2.detTrend <- trendList[["l.d2.detTrend"]]
+  
+  # Check for inclusion of seasonals
+  if (!season) Season <- NULL
+  else {
+    periodX <- periodicity(X)$scale
+    if (periodX == 'monthly') freq <- 12
+    else if (periodX == 'quarterly') freq <- 4
+    else stop('Seasonal factors are not supplied for other periodicities than month and quarterly')
+    Season <- xts(matrix(rep(c(1, 
+                               rep(0, freq - 2), 
+                               -1), 
+                             Time + k - 1)[seq_len((freq - 1) * (Time + k))], 
+                         Time + k, byrow = T), 
+                  fullSampleVec)
+    
+    colnames(Season) <- paste('Season', seq_len(ncol(Season)), sep = '.')
+  }
+  
+  # Constructing lags and first differences
+  d.X	          <- diff(X)
+  colnames(d.X) <- paste('d', colnames(X), sep = '.')
+  l.X	          <- lag(X)
+  colnames(l.X) <- paste('l', colnames(l.X), sep='.')
+  
+  if (missing(rank) || length(rank) == 1) {
+    # Include lagged differences, NA if number of lags does not exceed k
+    if(k == 1) 
+      l.d.X <- NULL
     else {
-        periodX <- periodicity(X)$scale
-        if (periodX == 'monthly') freq <- 12
-        else if (periodX == 'quarterly') freq <- 4
-        else stop('Seasonal factors are not supplied for other periodicities than month and quarterly')
-        Season <- xts(matrix(rep(c(1, rep(0, freq - 2), -1), Time + k - 1)[seq_len((freq - 1) * (Time + k))], Time + k, byrow = T), fullSampleVec)
-        colnames(Season) <- paste('Season', seq_len(ncol(Season)), sep = '.')
+      l.d.X           <- lag(d.X, seq(k - 1))
+      colnames(l.d.X) <- paste('l',
+                               rep(seq(k - 1), each = ncol(X)),
+                               '.',
+                               colnames(d.X),
+                               sep = '')
     }
-
-    if (missing(dummy)) Dummy <- NULL
-    else Dummy <- try.xts(dummy)
-
-    d.X	<- diff(X)
-    colnames(d.X) <- paste('d', colnames(X), sep = '.')
-    l.X	<- lag(X)
-    colnames(l.X) <- colnames(X)
-
-    if (missing(rank) || length(rank) == 1) {
-        if(k == 1) l.d.X <- xts(, fullSampleVec)
-        else {
-            l.d.X <- lag(d.X, seq(k - 1))
-            colnames(l.d.X) <- paste('l',
-                                     rep(seq(k - 1),
-                                         each = ncol(X)),
-                                     '.',
-                                     colnames(d.X), sep = '')
-        }
-
-        if (is.null(ncol(W))) l.d.W <- NULL
-        else {
-            l.d.W <- lag(diff(W), seq_len(k) - 1)
-            colnames(l.d.W) <- c(paste('d', colnames(W), sep = '.'),
-                                 if (k == 1) NULL
-                                 else paste('l', rep(seq(k - 1), each = ncol(W)), '.d.', colnames(W), sep = ''))
-        }
-
-        if (dettrend == -1)
-            Det1 <- Det2 <- NULL
-        else if (dettrend == 0) {
-            Det1 <- xtsTime[, 1]
-            Det2 <- NULL
-        }
-        else {
-            Det1 <- xtsTime[, dettrend + 1]
-            Det2 <- xtsTime[, seq_len(dettrend)]
-        }
-
-        tmp <- list(X = X)
-        tmp$Z0 <- d.X[effectiveSample]
-        tmp$Z1 <- merge(l.X, W, Det1)[effectiveSample]
-        Z2 <- merge(l.d.X, l.d.W, Season, Dummy, Det2)
-        if (is.null(ncol(Z2))) tmp$Z2 <- l.d.X
-        else tmp$Z2 <- Z2[effectiveSample]
-        stopifnot(all(sapply(tmp, function(x) all(!is.na(x)))))
-        class(tmp) <- 'model.frame.I1'
+    
+    
+    tmp    <- list(X = X)
+    tmp$Z0 <- d.X[effectiveSample]
+    tmp$Z1 <- merge(l.X, l.W, l.detTrend)[effectiveSample]
+    Z2     <- merge(l.d.X, l.d.W, l.d.detTrend, Season)
+    if (is.null(ncol(Z2)) || ncol(Z2)==0) tmp$Z2 <- l.d.X
+    else tmp$Z2 <- Z2[effectiveSample]
+    stopifnot(all(sapply(tmp, function(x) all(!is.na(x)))))
+    class(tmp) <- 'model.frame.I1'
+  }
+  else if (length(rank) == 2) {
+    l.d.X           <- lag(diff(X))
+    colnames(l.d.X) <- paste('l', '.d.', colnames(X), sep = '')
+    d2.X            <- diff(d.X)
+    colnames(d2.X)  <- paste('d2', colnames(X), sep = '.')
+    if (k == 1) stop('In the I(2) model there must be at least two lags')
+    else if (k == 2) l.d2.X <- xts(, fullSampleVec)
+    else {
+      l.d2.X <- lag(d2.X, seq_len(k - 2))
+      colnames(l.d2.X) <- paste('l', rep(1:(k - 2), each = ncol(X)), '.d2.', colnames(X), sep = '')
     }
-    else if (length(rank) == 2) {
-        l.d.X <- lag(diff(X))
-        colnames(l.d.X) <- paste('l', '.d.', colnames(X), sep = '')
-        d2.X <- diff(d.X)
-        colnames(d2.X) <- paste('d2', colnames(X), sep = '.')
-        if (k == 1) stop('In the I(2) model there must be at least two lags')
-        else if (k == 2) l.d2.X <- xts(, fullSampleVec)
-        else {
-            l.d2.X <- lag(d2.X, seq_len(k - 2))
-            colnames(l.d2.X) <- paste('l', rep(1:(k - 2), each = ncol(X)), '.d2.', colnames(X), sep = '')
-        }
-
-        if (is.null(ncol(W))) d.W <- l.d2.W <- NULL
-        else {
-            d.W <- diff(W)
-            l.d2.W <- lag(diff(d.W), seq_len(k - 1) - 1)
-            colnames(d.W) <- paste('d', colnames(W), sep = '.')
-            colnames(l.d2.W) <- c(paste('d2', colnames(W), sep = '.'),
-                                  if (k == 2) NULL
-                                  else paste('l', rep(seq_len(k - 2), each = ncol(W)), '.d2.', colnames(W), sep =''))
-        }
-
-        if (dettrend == -1)
-            Det1 <- Det2 <- Det3 <- NULL
-        else if (dettrend == 0) {
-            Det2 <- xtsTime[, 1]
-            Det1 <- Det3 <- NULL
-        }
-        else if (dettrend == 1) {
-            Det2 <- xtsTime[, 2]
-            Det1 <- xtsTime[, 1]
-            Det3 <- NULL
-        }
-        else {
-            Det2 <- xtsTime[, dettrend + 1]
-            Det1 <- xtsTime[, dettrend]
-            Det3 <- xtsTime[, seq_len(dettrend - 1)]
-        }
-
-        tmp <- list(X = X)
-        tmp$Z0 <- d2.X[effectiveSample]
-        tmp$Z1 <- merge(l.d.X, d.W, Det1)[effectiveSample]
-        tmp$Z2 <- merge(l.X, W, Det2)[effectiveSample]
-        Z3 <- merge(l.d2.X, l.d2.W, Season, Dummy, Det3)
-        if (is.null(ncol(Z3))) tmp$Z3 <- l.d2.X
-        else tmp$Z3 <- Z3[effectiveSample]
-        stopifnot(all(sapply(tmp, function(x) all(!is.na(x)))))
-        class(tmp) <- 'model.frame.I2'
+    
+    if (is.null(ncol(W))) l.W <- l.d.W <- l.d2.W <- NULL
+    else {
+      l.W   <- lag(W)
+      colnames(l.W) <- colnames(W)
+      l.d.W <- diff(l.W)
+      colnames(l.d.W) <- paste('d', colnames(W), sep = '.')
+      l.d2.W <- lag(diff(d.W), seq_len(k - 1) - 1)
+      colnames(d.W) <- paste('d', colnames(W), sep = '.')
+      colnames(l.d2.W) <- c(paste('d2', colnames(W), sep = '.'),
+                            if (k == 2) NULL
+                            else paste('l', rep(seq_len(k - 2), each = ncol(W)), '.d2.', colnames(W), sep =''))
     }
-
-    return(tmp)
+    
+    tmp    <- list(X = X)
+    tmp$Z0 <- d2.X[effectiveSample]
+    tmp$Z1 <- merge(l.d.X, l.d.W, l.d.detTrend)[effectiveSample]
+    tmp$Z2 <- merge(l.X, l.W, l.detTrend)[effectiveSample]
+    Z3     <- merge(l.d2.X, l.d2.W, l.d2.detTrend, Season)
+    if (is.null(ncol(Z3))) tmp$Z3 <- l.d2.X
+    else tmp$Z3 <- Z3[effectiveSample]
+    stopifnot(all(sapply(tmp, function(x) all(!is.na(x)))))
+    class(tmp) <- 'model.frame.I2'
+  }
+  
+  return(tmp)
 }
 
 ## A function to print matrices of coefficient estimates with se og t.values
@@ -366,6 +378,70 @@ datestring <- function(dates, freq) {
     return(ans)
 }
 
+dettrendbuild <- function(dateIndex,lags,dettrend) {
+  # Construct the deterministic trend to include in the system
+  # 
+  # Args:
+  #   dateIndex: an index of the dates matrich the dates in the
+  #               effective sample
+  #   
+  #   lags: number of lags in the model
+  #
+  #   dettrend: specification of the trend 
+  #       - none 
+  #       - mean
+  #       - drift
+  #       - qtrend
+  #       - urmean
+  #
+  # Returns
+  #   trendList: list with the deterministic trends to included
+  #              inside and outside the cointegration relations
+  # 
+  
+  # Construct deterministic trends
+  if (dettrend == "mean") {
+    detTrend             <- xts(rep(1, length(dateIndex)), dateIndex)
+    l.detTrend           <- lag(detTrend)[-seq_len(lags)]
+    colnames(l.detTrend) <- 'ci-constant'
+    l.d.detTrend         <- NULL
+    l.d2.detTrend        <- NULL
+  }
+  else if(dettrend == "drift") {
+    # Construct xts variable with a constant and polynomial trends
+    detTrend               <- xts(cbind(poly(seq_len(length(dateIndex)), 1, raw = T)), dateIndex)
+    l.detTrend             <- lag(detTrend)
+    colnames(l.detTrend)   <- c('ci-trend')
+    l.d.detTrend           <- diff(lag(detTrend))
+    colnames(l.d.detTrend) <- "constant"
+    l.d2.detTrend          <- NULL
+  } 
+  else if(dettrend == "qtrend" && lags > 1) {
+    detTrend                <- xts(cbind(poly(seq_len(length(dateIndex)), 2, raw = T)), dateIndex)
+    l.detTrend              <- lag(detTrend)
+    colnames(l.detTrend)    <- c('ci-qtrend')
+    l.d.detTrend            <- diff(detTrend)
+    colnames(l.d.detTrend)  <- c('trend')
+    l.d2.detTrend           <- diff(diff(detTrend))
+    colnames(l.d2.detTrend) <- c('constant')
+  } else if(dettrend == "urmean") {
+    detTrend             <- xts(rep(1, length(dateIndex)), dateIndex)
+    l.detTrend           <- NULL
+    l.d.detTrend         <- lag(detTrend)[-seq_len(lags)]
+    colnames(l.d.detTrend) <- 'constant'
+    l.d2.detTrend        <- NULL
+  }
+  else {
+    l.detTrend <- NULL
+    l.d.detTrend <- NULL
+    l.d2.detTrend <- NULL
+  }
+  
+  trendList <- list('l.detTrend'=l.detTrend,
+                    'l.d.detTrend'=l.d.detTrend,
+                    'l.d2.detTrend'=l.d2.detTrend)
+}
+
 ### Calculates the eigenvalues of the companion matrix of the VAR. The argument
 ### 'roots' can be either a vector of ranks for which the eigenvalues should be
 ### computed, the default value 'max' which will give the eigenvalues for all
@@ -408,7 +484,7 @@ I1gls <- function(obj, r) {
     obj$call <- cl
     obj$beta <- rbind(diag(1, r), bEta0)
 
-    obj	<- auxI1(obj)
+    obj	<- aux.I1(obj)
     class(obj) <- 'I1gls'
 
     return(obj)
@@ -698,7 +774,7 @@ restrictAlpha <- function(obj, A.matrix, type = 'restr') {
         }
     }
 
-    obj <- auxI1(obj)
+    obj <- aux.I1(obj)
 
     return(obj)
 }
@@ -761,7 +837,7 @@ restrictBeta <- function(obj, H.matrix) {
             else i <- i + 1
         }
     }
-    obj	<- auxI1(obj)
+    obj	<- aux.I1(obj)
 
     return(obj)
 }
@@ -802,7 +878,7 @@ restrictTau <- function(obj, Hmat) {
     obj$rho <- ans$rho
     obj$psi <- ans$psi
     obj$kappa <- ans$kappa
-    obj	<- auxI2(obj, p0 - s1 - s2)
+    obj	<- aux.I2(obj, p0 - s1 - s2)
     return(obj)
 }
 
@@ -907,7 +983,7 @@ setrankI1 <- function(obj, r) {
         obj$beta <- matrix(, ncol(obj$Z1), 0)
     }
 
-    obj <- auxI1(obj)
+    obj <- aux.I1(obj)
     return(obj)
 }
 
@@ -984,7 +1060,7 @@ setrankI2 <- function(obj, r) {
     ft$R0 <- R0
     ft$R1 <- R1
     ft$R2 <- R2
-    ft <- auxI2(ft, r[1])
+    ft <- aux.I2(ft, r[1])
 
     ## ft$frequency <- obj$frequency
     return(ft)
@@ -1790,61 +1866,68 @@ VAR.I2 <- function(object, ...) {
     class(A) <- 'VAR'
     return(A)
 }
-
-VECM <- function(data, lags, dettrend, rank, season, dummy, exogenous, method = 'rrr') {
-    # Function that creates a Vector Error Correction Model (VECM) object.
-    #
-    # Args:
-    #   data: An xts object containing the data to be analyzed 
-    #   lags: the number of lags in levels
-    #
-    #
+VECM <- function(data, lags, dettrend, rank, season, exogenous, method = 'rrr') {
+  # Function that creates a Vector Error Correction Model (VECM) object.
+  #
+  # Args:
+  #   data: An xts object containing the data to be analyzed 
+  #   lags: the number of lags in levels
+  #   dettrend: specifies the deterministic trend structure
+  #         - none
+  #         - mean
+  #         - drift
+  #         - qtrend
+  #         - urmean
+  #   season: specified is whether inclusion of seasonal dummies is desired
+  #   exogenous: an xts object with exogenous variables to be included 
+  #       
+  # Returns
+  #   ft: an object of type I1
+  #
   
+  # Record the function call for later use
+  cl <- match.call() # For the VECM call
+  mf <- match.call() # For the CIModelFrame call
   
-    cl <- match.call()
-    mf <- match.call()
-
-    m <- match(c('data', 'dummy', 'exogenous'), names(mf), 0L)
-    if (any(missing(data), missing(lags), missing(dettrend))) stop('The arguments data, lags and dettrend are required')
-    ## if (!inherits(data, 'xts')) stop('Data must be of class xts')
-    if (any(is.na(data))) stop('Data contains NAs')
-    if (!any(lags %in% seq(12))) stop ('The model must have lags between 1 and 12')
-    ## if (!missing(exogenous)) {
-    ##     if (!inherits(exogenous, 'xts')) stop('Exogenous variables must be of class
-	  ## 	 xts')
-    ##     if (sum(is.na(exogenous))) stop('Exogenous variables contains NAs')
-    ## }
-    ## if (!missing(dummy)) {
-    ##     if (!inherits(dummy, 'xts')) stop('Dummy variables must be of class xts')
-    ##     if (any(is.na(dummy))) stop('Dummy variables contains NAs')
-    ## }
-    ## if (!dettrend %in% c('none', 'mean', 'drift')) stop('The determistic specification must be either none, mean or drift')
-
-    mf[[1L]] <- as.name("CIModelFrame")
-    mf       <- eval(mf, parent.frame())
-
-    if (missing(rank)) {
-        ft      <- rrr(mf$Z0, mf$Z1, mf$Z2, ncol(mf$Z0))
-        ft$lags <- lags
-        ft      <- auxI1(ft)
-    }
-    else if (length(rank) == 1) {
-        ft      <- rrr(mf$Z0, mf$Z1, mf$Z2, ncol(mf$Z0))
-        ft$lags <- lags
-        ft      <- setrankI1(ft, rank)
-    }
-    else if (length(rank) == 2) {
-        ## if (!(cl[['dettrend']] %in% c('none', 'drift'))) stop('Deterministic specification must me either none og drift')
-        if (lags < 2) stop('There must be at least tow lags in the model')
-        mf$lags <- lags
-        ft      <- setrankI2(mf, rank)
-    }
-    else stop('Illegal choice of rank')
-
-    ft$call <- cl
-    attr(ft$call, 'environment') <- parent.frame()
-    ft$X    <- mf$X
-
-    return(ft)
+  m <- match(c('data', 'dummy', 'exogenous'), names(mf), 0L)
+  if (any(missing(data), missing(lags), missing(dettrend))) stop('The arguments data, lags and dettrend are required')
+  if (!inherits(data, 'xts')) stop('Data must be of class xts')
+  if (any(is.na(data))) stop('Data contains NAs')
+  if (!any(lags %in% seq(12))) stop ('The model must have lags between 1 and 12')
+  if (!dettrend %in% c('none', 'mean', 'drift','qtrend','urmean')) stop('The determistic specification must be either none, mean or drift')
+  
+  # Check for inlcusion of exogenous variables as xts objects
+  if (!missing(exogenous)) {
+    if (!inherits(exogenous, 'xts')) stop('Exogenous variables must be of class xts')
+    if (sum(is.na(exogenous))) stop('Exogenous variables contains NAs') 
+  }
+  
+  mf[[1L]] <- as.name("CIModelFrame")
+  mf       <- eval(mf, parent.frame())
+  
+  if (missing(rank)) {
+    ft      <- rrr(mf$Z0, mf$Z1, mf$Z2, ncol(mf$Z0))
+    ft$lags <- lags
+    ft      <- auxI1(ft)
+  }
+  else if (length(rank) == 1) {
+    ft      <- rrr(mf$Z0, mf$Z1, mf$Z2, ncol(mf$Z0))
+    ft$lags <- lags
+    ft      <- setrankI1(ft, rank)
+  }
+  else if (length(rank) == 2) {
+    ## if (!(cl[['dettrend']] %in% c('none', 'drift'))) stop('Deterministic specification must me either none og drift')
+    if (lags < 2) stop('There must be at least tow lags in the model')
+    mf$lags <- lags
+    ft      <- setrankI2(mf, rank)
+  }
+  else stop('Illegal choice of rank')
+  
+  ft$call <- cl
+  attr(ft$call, 'environment') <- parent.frame()
+  ft$X    <- mf$X
+  
+  return(ft)
 }
+
 
