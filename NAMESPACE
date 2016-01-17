@@ -1,7 +1,7 @@
 useDynLib("civecm")
 
 # functions
-export(betaNorm, boot, CIModelFrame, eigen, I1gls, testLagLength, lag.default, largeres, LaTeX, restrictAlpha, restrictBeta, restrictTau, testARCH, testAutocor, testExclude, testNormal, testResiduals, testStationary, testUnit, testWeakexo, tracetest, VAR, VECM)
+export(betaNorm, boot, CIModelFrame, eigen, I1gls, testLagLength, lag.default, largeres, LaTeX, restrictAlpha, restrictBeta, restrictLongRun, restrictTau, testARCH, testAutocor, testExclude, testNormal, testResiduals, testStationary, testUnit, testWeakexo, tracetest, VAR, VECM)
 
 importFrom(stats, anova, logLik, residuals, rstandard, simulate)
 
