@@ -1,4 +1,16 @@
 auxI1 <- function(ft) {
+  # This function constructs the I1 objects taking a
+  # a class or a list containing at least Z0,Z1,Z2, alpha
+  # and beta. FOr models with short run elements, it also
+  # has to contain Psi.
+  # 
+  # Args
+  #   List or object containing a minimum set of information
+  #
+  # Return
+  #   I1 Object
+  #
+  
   if (ncol(ft$beta) > 0)
   {
     colnames(ft$beta)  <- paste('beta(', 1:ncol(ft$beta), ')', sep = '')
