@@ -1,3 +1,26 @@
+anova.I1 <- function(objList, ..., df) {
+  # Construct a Likelihood Ratio test between two models. The test
+  # assumes a chi-square limiting distribution and is hence not 
+  # adapted to nonstandard cases.
+  #
+  # Args
+  #   objList: a list of objects of type I1
+  #   df: the number of degrees of freedom the test has
+  # 
+  # Return:
+  #   data.frame containing the test value, the coresponding p-value from 
+  #   a chi-sqaure distribution with df degrees of freedom
+  #
+  
+  if(length(objects <- list(objList, ...)) == 1) stop('Nothing to test against')
+  test <- 2 * (logLik(objects[[1]]) - logLik(objects[[2]]))
+  return(data.frame(Value = test,
+                    Test = paste('ChiSq(', df, ')', sep = ''),
+                    p.value = 1 - pchisq(test, df)
+  )
+  )
+}
+
 testARCH <- function(obj, order) {
   if (!inherits(obj, 'I1')) stop('Object must have class I1')
   
