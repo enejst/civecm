@@ -13,29 +13,6 @@
 # Development taken over by Emil Nejstgaard
 #
 
-anova.I1 <- function(objList, ..., df) {
-  # Construct a Likelihood Ratio test between two models. The test
-  # assumes a chi-square limiting distribution and is hence not 
-  # adapted to nonstandard cases.
-  #
-  # Args
-  #   objList: a list of objects of type I1
-  #   df: the number of degrees of freedom the test has
-  # 
-  # Return:
-  #   data.frame containing the test value, the coresponding p-value from 
-  #   a chi-sqaure distribution with df degrees of freedom
-  #
-  
-  if(length(objects <- list(objList, ...)) == 1) stop('Nothing to test against')
-  test <- 2 * (logLik(objects[[1]]) - logLik(objects[[2]]))
-  return(data.frame(Value = test,
-                    Test = paste('ChiSq(', df, ')', sep = ''),
-                    p.value = 1 - pchisq(test, df)
-  )
-  )
-}
-
 CIModelFrame <- function(data, lags, dettrend, rank, season = FALSE, exogenous, ...) {
   # Function that creates a model.frame object. Either I1 or I2. 
   # 
@@ -449,16 +426,6 @@ logLik.I1 <- function(object, const = TRUE, ...) {
   return(ll)
 }
 
-Null <- function(M) {
-  # Function borrowed from MASS but with here is the convention that the Null of a zero column matrix
-  # is the identity
-  tmp <- qr(M)
-  set <- if (tmp$rank == 0) seq_len(ncol(M))
-  else -seq_len(tmp$rank)
-  ans <- if (ncol(M) == 0) diag(nrow(M))
-  else qr.Q(tmp, complete = TRUE)[, set, drop = FALSE]
-  return(ans)
-}
 
 residuals.I1	<- function(object, ...) {
   tmp	<- object$residuals
