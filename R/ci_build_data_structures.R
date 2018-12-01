@@ -32,9 +32,9 @@ ci_build_data_structures <- function(spec, data, make_M = TRUE, make_R = TRUE, m
     if(make_M == TRUE || make_R == TRUE || make_S == TRUE) {
       if(q > 1) {
         if(M == TRUE) {
-          M$M02 <- (1/n) * t(Z0) * Z2
-          M$M12 <- (1/n) * t(Z1) * Z2
-          M$M22 <- (1/n) * t(Z2) * Z2
+          M$M02 <- (1/n) * crossprod(Z0, Z2)
+          M$M12 <- (1/n) * crossprod(Z1, Z2)
+          M$M22 <- (1/n) * crossprod(Z2, Z2)
         }
       }
       # Construct R matrices (residuals) ----
@@ -49,9 +49,9 @@ ci_build_data_structures <- function(spec, data, make_M = TRUE, make_R = TRUE, m
         }
       
         if(make_S == TRUE) {
-          S$S00 <- (1/n) * t(R0) %*% R0
-          S$S01 <- (1/n) * t(R0) %*% R1
-          S$S11 <- (1/n) * t(R1) %*% R1
+          S$S00 <- (1/n) * crossprod(R0, R0)
+          S$S01 <- (1/n) * crossprod(R0, R1)
+          S$S11 <- (1/n) * crossprod(R1, R1)
         }
       }
     }
