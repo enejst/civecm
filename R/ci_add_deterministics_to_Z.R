@@ -8,16 +8,17 @@
 
 ci_add_deterministics_to_Z <- function(det_spec, q, Z) {
   
-  Z0 <- Z$Z0
   Z1 <- Z$Z1
   Z2 <- Z$Z2
   
+  n <- nrow(Z1)
+  dates <- zoo::index(Z1)
   constant <- xts::xts(1, dates)
   trend <- xts::xts(seq_len(n-q), dates)
   
   Z1 <- switch(
     det,
-    "none" = LX,
+    "none" = Z1,
     "ci_constant" = merge(Z1, constant),
     "constant" = merge(Z1, trend),
     "ci_trend" = merge(merge(Z1, constant), trend),
@@ -43,5 +44,7 @@ ci_add_deterministics_to_Z <- function(det_spec, q, Z) {
     stop("Unknown deterministic specification")
   )
   
-  list(Z0 = Z0, Z1 = Z1, Z2 = Z2)
+  Z$Z1 <- Z1
+  Z$Z2 <- Z2
+  Z 
 }

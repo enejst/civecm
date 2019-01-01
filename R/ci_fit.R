@@ -21,6 +21,10 @@ ci_fit <- function(data,
                    h_beta = NULL,
                    exogenous = NULL) {
   
+  if(!is.null(exogenous)) {
+    stopifnot(identical(zoo::index(data), zoo::index(exogenous)))
+  }
+  
   if(is.null(H_alpha) && is.null(H_beta)) {
     dstruct <- ci_build_data_structures(data, spec, make_R = TRUE)
     estimates <- ci_estimate_unrestricted(dstruct$R0, dstruct$R1, spec$rank)

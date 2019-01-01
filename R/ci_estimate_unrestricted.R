@@ -7,11 +7,12 @@
 #' @return a list with an estimate for alpha and beta.
 
 ci_estimate_unrestricted <- function(R0, R1, r) {
+  n <- nrow(R0)
   svdR0 <- svd(R0)
   svdR1 <- svd(R1)
   svd01 <- svd(crossprod(svdR0$u, svdR1$u))
   values	<- svd01$d^2
-  vectors	<- svd01$v * sqrt(Time)
+  vectors	<- svd01$v * sqrt(n)
   for (i in 1:length(svdR1$d))
   {
     if (svdR1$d[i] > 2e-16)
@@ -21,7 +22,7 @@ ci_estimate_unrestricted <- function(R0, R1, r) {
   }
   vectors <- svdR1$v%*%ans$vectors
   beta_hat <- vectors[, 1:r, drop = FALSE]
-  alpha_hat <- t(lm.fit(R1%*%beta_hat, R0)$coef)
+  alpha_hat <- t(stats::lm.fit(R1%*%beta_hat, R0)$coef)
   
   results <- list(alpha = alpha_hat, beta = beta_hat)
 }

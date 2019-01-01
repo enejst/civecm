@@ -29,7 +29,7 @@ ci_simulate <- function(model,
   # Get model data ----
   p <- nrow(model$alpha)
   lags <- model$spec$lags
-  detspec <- model$spec$deterministic
+  det_spec <- model$spec$det_spec
   alpha <- model$alpha
   beta <- model$beta
   tGamma <- ifelse(is.null(model$Gamma), NULL, t(model$Gamma))
@@ -40,7 +40,7 @@ ci_simulate <- function(model,
   # the number of observations in both match
   if(!is.null(shocks)) {
     if(!is.null(exogenous)) {
-      stopifnot((nrows(shocks) + lags) == nrows(exogenous))
+      stopifnot((nrow(shocks) + lags) == nrow(exogenous))
     }
   }
   
@@ -65,11 +65,11 @@ ci_simulate <- function(model,
     nobs <- nrow(shocks) + lags
   }else {
     Omega <- model$Omega
-    shocks <- xts::xts(randn(nobs, p) %*% Omega, time_idx)
+    shocks <- xts::xts(stats::rnorm(nobs, p) %*% Omega, time_idx)
   }
   
   if(is.null(initial)) {
-    per <- periodicity(time_idx)$scale
+    per <- xts::periodicity(time_idx)$scale
     initial <- matrix(0, lags, p)
     initial <- xts::xts(initial, 
                         seq(time_idx[1]-(lags + 1), time_idx - 1, by = per))
@@ -78,7 +78,7 @@ ci_simulate <- function(model,
   X <- rbind(initial, X)
   
   D <- switch(
-    detspec,
+    det_spec,
     "ci_constant" = xts::xts(matrix(1, nobs, 1), time_idx),
     "constant" = xts::xts(matrix(1, nobs, 1), time_idx),
     "ci_trend" = xts::xts(cbind(matrix(1, nobs, 1), matrix(1:nobs, nobs, 1)), time_idx),
@@ -101,12 +101,12 @@ ci_simulate <- function(model,
     
     if(lags > 1) {
       DX_1 <- diff(X[(i - lags):(i - 1)], 1)
-      DXX <- tail(xts::lag.xts(DX_1, seq_len(lags - 2)), 1)
+      DXX <- utils::tail(xts::lag.xts(DX_1, seq_len(lags - 2)), 1)
       X[i,] <- X[i,] + DXX %*% tGamma
     }
     
     X[i,] <- X[i,] + switch(
-      detspec,
+      det_spec,
       "ci_constant" = D %*% tcrossprod(beta[p,], alpha),
       "constant" = D %*% tcrossprod(beta[p,], alpha) + tPhi[1,],
       "ci_trend" = D %*% tcrossprod(beta[p + 0:1,], alpha) + tPhi[1,],
@@ -118,9 +118,9 @@ ci_simulate <- function(model,
     if(!is.null(exogenous)) {
       X[i,] <- X[i,] + LE[i - 1,] %*% tcrossprod(beta[p + 1:pe,], alpha)
       if(lags > 1) {
-        iDEE <- tail(xts::lag.xts(DEE, seq_len(lags - 1)), 1)
+        iDEE <- utils::tail(xts::lag.xts(DEE, seq_len(lags - 1)), 1)
         itPhi <- switch(
-          detspec, 
+          det_spec, 
           "ci_constant" = tPhi, 
           "constant" = tPhi[2:pe,], 
           "ci_trend" = tPhi[2:pe,],
